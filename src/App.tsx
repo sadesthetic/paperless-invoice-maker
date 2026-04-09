@@ -531,9 +531,9 @@ export default function App() {
               </div>
 
               {/* Preview — footer */}
-              <div className="mt-12 pt-8 border-t border-gray-100 flex justify-between items-end gap-4">
-                {/* Notes */}
-                <div className="max-w-[200px] flex-1">
+              <div className="mt-12 pt-8 border-t border-gray-100 flex justify-between items-end gap-6">
+                {/* Notes — takes most of the space */}
+                <div className="flex-[2] min-w-0">
                   {data.notes && (
                     <>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-gray-300 mb-1.5">
@@ -551,18 +551,18 @@ export default function App() {
                   <div className="flex flex-col items-center gap-2 shrink-0">
                     {data.showQr && (
                       <div className="p-2.5 border border-gray-100 rounded-xl bg-white shadow-sm">
-                        <QRCodeSVG value={data.paymentLink} size={90} level="L" />
+                        <QRCodeSVG value={data.paymentLink} size={80} level="L" />
                       </div>
                     )}
-                    <p className="text-[8px] text-gray-300 break-all font-mono text-center max-w-[120px]">
+                    <p className="text-[8px] text-gray-300 break-all font-mono text-center max-w-[110px]">
                       {data.paymentLink}
                     </p>
                   </div>
                 )}
 
-                {/* Totals */}
-                <div className="text-right space-y-2 flex-1">
-                  <div className="flex justify-between gap-8 text-xs">
+                {/* Totals — compact, fixed width */}
+                <div className="text-right space-y-1.5 shrink-0">
+                  <div className="flex justify-between gap-6 text-[10px]">
                     <span className="text-gray-300 uppercase font-bold">Subtotal</span>
                     <span className="font-medium">
                       {data.currency}
@@ -573,7 +573,7 @@ export default function App() {
                     </span>
                   </div>
                   {data.taxRate > 0 && (
-                    <div className="flex justify-between gap-8 text-xs">
+                    <div className="flex justify-between gap-6 text-[10px]">
                       <span className="text-gray-300 uppercase font-bold">
                         Tax ({data.taxRate}%)
                       </span>
@@ -586,9 +586,9 @@ export default function App() {
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between gap-8 pt-3 border-t border-gray-100">
-                    <span className="text-sm font-black uppercase tracking-widest">Total</span>
-                    <span className="text-xl font-black">
+                  <div className="flex justify-between gap-6 pt-2 border-t border-gray-100">
+                    <span className="text-xs font-black uppercase tracking-widest">Total</span>
+                    <span className="text-sm font-black">
                       {data.currency}
                       {total.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
