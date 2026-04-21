@@ -61,11 +61,12 @@ const INITIAL_DATA: DocumentData = {
     { id: '3', description: 'UX Design', quantity: 1, price: 200 },
     { id: '4', description: 'Website Copywriting', quantity: 1, price: 100 },
   ],
-  taxes: 0,
+  taxesRate: 0,
   handlingFee: 0,
+  handlingFeeType: 'fixed',
   notes: '',
   paymentMethod: 'Cash',
-  upi: 'innovustech@uboi',
+  userTag: 'innovustech@uboi',
   paymentLink: 'upi://pay?pa=dummy&pn=Dummy',
   showQr: true,
 };
@@ -98,7 +99,9 @@ export default function App() {
 
   /* ── Computed totals ───────────────────────────────────────── */
   const subtotal = data.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const total = subtotal + data.taxes + data.handlingFee;
+  const taxesAmount = subtotal * (data.taxesRate / 100);
+  const handlingAmount = data.handlingFeeType === 'percentage' ? (subtotal * (data.handlingFee / 100)) : data.handlingFee;
+  const total = subtotal + taxesAmount + handlingAmount;
 
   /* ── Line item helpers ─────────────────────────────────────── */
   const addItem = () => {
@@ -371,17 +374,24 @@ export default function App() {
              
              <div className="flex flex-col md:flex-row gap-4 mt-2 pt-4 border-t border-slate-100">
                  <div className="flex-1">
-                    <label className={labelCls}>Taxes</label>
+                    <label className={labelCls}>Taxes (%)</label>
                     <div className="relative">
-                       <span className="absolute left-3 top-2.5 text-slate-400 font-semibold">$</span>
-                       <input type="number" min={0} className={cn(inputCls, "pl-7")} value={data.taxes} onChange={(e) => setData(p => ({...p, taxes: parseFloat(e.target.value) || 0}))}/>
+                       <input type="number" min={0} className={cn(inputCls, "pr-7")} value={data.taxesRate} onChange={(e) => setData(p => ({...p, taxesRate: parseFloat(e.target.value) || 0}))}/>
+                       <span className="absolute right-3 top-2.5 text-slate-400 font-semibold">%</span>
                     </div>
                  </div>
                  <div className="flex-1">
-                    <label className={labelCls}>Handling & Transport</label>
+                    <div className="flex justify-between items-center mb-1">
+                       <label className={labelCls + " mb-0"}>Handling & Transport</label>
+                       <select className="text-xs bg-slate-100 border text-slate-600 border-slate-200 rounded px-2 py-0.5 outline-none cursor-pointer" value={data.handlingFeeType} onChange={(e) => setData(p => ({...p, handlingFeeType: e.target.value as 'fixed' | 'percentage'}))}>
+                          <option value="fixed">Fixed ($)</option>
+                          <option value="percentage">%</option>
+                       </select>
+                    </div>
                     <div className="relative">
-                       <span className="absolute left-3 top-2.5 text-slate-400 font-semibold">$</span>
-                       <input type="number" min={0} className={cn(inputCls, "pl-7")} value={data.handlingFee} onChange={(e) => setData(p => ({...p, handlingFee: parseFloat(e.target.value) || 0}))}/>
+                       {data.handlingFeeType === 'fixed' && <span className="absolute left-3 top-2.5 text-slate-400 font-semibold">$</span>}
+                       <input type="number" min={0} className={cn(inputCls, data.handlingFeeType === 'fixed' ? 'pl-7' : 'pr-7')} value={data.handlingFee} onChange={(e) => setData(p => ({...p, handlingFee: parseFloat(e.target.value) || 0}))}/>
+                       {data.handlingFeeType === 'percentage' && <span className="absolute right-3 top-2.5 text-slate-400 font-semibold">%</span>}
                     </div>
                  </div>
               </div>
@@ -399,11 +409,11 @@ export default function App() {
                    <input type="text" className={inputCls} value={data.paymentMethod} onChange={(e) => setData(p => ({...p, paymentMethod: e.target.value}))}/>
                 </div>
                 <div className="col-span-full md:col-span-1">
-                   <label className={labelCls}>UPI / VPA</label>
-                   <input type="text" className={inputCls} value={data.upi || ''} onChange={(e) => setData(p => ({...p, upi: e.target.value}))}/>
+                   <label className={labelCls}>User Tag</label>
+                   <input type="text" className={inputCls} value={data.userTag || ''} onChange={(e) => setData(p => ({...p, userTag: e.target.value}))}/>
                 </div>
                 <div className="col-span-full md:col-span-1">
-                   <label className={labelCls}>QR Payment Link / URL</label>
+                   <label className={labelCls}>User Profile Link (QR)</label>
                    <input type="text" className={inputCls} value={data.paymentLink || ''} onChange={(e) => setData(p => ({...p, paymentLink: e.target.value}))}/>
                 </div>
                 <div className="col-span-full">
@@ -528,8 +538,8 @@ export default function App() {
                          <div>
                             <p className="font-semibold text-white mb-2">Payment Method</p>
                             <p className="text-[#b0b0b0]">{data.paymentMethod}</p>
-                            {data.upi && (
-                               <p className="text-[#b0b0b0] mt-1"><span className="text-white font-semibold">UPI:</span> {data.upi}</p>
+                            {data.userTag && (
+                               <p className="text-[#b0b0b0] mt-1"><span className="text-white font-semibold">User:</span> {data.userTag}</p>
                             )}
                          </div>
                          {data.showQr && data.paymentLink && (
@@ -544,22 +554,22 @@ export default function App() {
                       </div>
                       
                       <div className="w-[45%] ml-auto max-w-[280px]">
-                         {data.taxes > 0 || data.handlingFee > 0 ? (
+                         {taxesAmount > 0 || handlingAmount > 0 ? (
                             <>
                                <div className="flex justify-between py-2 text-[#b0b0b0]">
                                    <span>Subtotal</span>
                                    <span>${formatMoney(subtotal)}</span>
                                </div>
-                               {data.taxes > 0 && (
+                               {taxesAmount > 0 && (
                                   <div className="flex justify-between py-2 text-[#b0b0b0]">
-                                      <span>Taxes</span>
-                                      <span>${formatMoney(data.taxes)}</span>
+                                      <span>Taxes ({data.taxesRate}%)</span>
+                                      <span>${formatMoney(taxesAmount)}</span>
                                   </div>
                                )}
-                               {data.handlingFee > 0 && (
+                               {handlingAmount > 0 && (
                                   <div className="flex justify-between py-2 text-[#b0b0b0]">
                                       <span>Handling & Transport</span>
-                                      <span>${formatMoney(data.handlingFee)}</span>
+                                      <span>${formatMoney(handlingAmount)}</span>
                                   </div>
                                )}
                             </>

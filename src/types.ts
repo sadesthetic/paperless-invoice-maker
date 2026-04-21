@@ -28,11 +28,12 @@ export interface DocumentData {
   customer: CustomerInfo;
   shippedTo: CustomerInfo;
   items: LineItem[];
-  taxes: number;
+  taxesRate: number;
   handlingFee: number;
+  handlingFeeType: 'fixed' | 'percentage';
   notes: string;
   paymentMethod: string;
-  upi?: string;
+  userTag?: string;
   paymentLink?: string;
   showQr: boolean;
 }
