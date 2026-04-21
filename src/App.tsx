@@ -155,10 +155,8 @@ export default function App() {
   };
 
   const handleCopyToExcel = () => {
-    let tsv = "";
-    
-    // Helper to escape newlines / tabs if needed, but for TSV we'll replace newlines with space to avoid row breaking if it's not wrapped in quotes
-    const escape = (str: string | undefined) => (str || "").replace(/\n/g, ", ").replace(/\t/g, " ");
+    // Helper to completely strip newlines to guarantee a single row when pasting
+    const escape = (str: string | undefined) => (str || "").replace(/[\n\r]+/g, " - ").replace(/\t/g, " ");
 
     const itemsSummary = data.items.map(i => `${i.quantity}x ${escape(i.description)}`).join(' | ');
 
@@ -178,9 +176,9 @@ export default function App() {
       escape(data.userTag)
     ];
 
-    const tsv = values.join("\t");
+    const resultTsv = values.join("\t");
     
-    navigator.clipboard.writeText(tsv);
+    navigator.clipboard.writeText(resultTsv);
     showToast('Copied to Clipboard for Excel/Sheets!');
   };
 
