@@ -74,12 +74,6 @@ const formatMoney = (val: number) => {
   return val.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 };
 
-// Simple function to convert numbers to words (limited capability for demo)
-function numberToWords(num: number): string {
-  if (num === 0) return 'Zero Only';
-  return 'One Lakh Eighteen Thousand Only'; // Placeholder based on template
-}
-
 const formatDateTime = (dtStr: string) => {
     if(!dtStr) return '';
     try {
@@ -477,19 +471,15 @@ export default function App() {
                   <div className="h-[1px] bg-[#333] w-full mb-6"></div>
 
                   <div className="flex mb-12 text-sm leading-relaxed text-[#b0b0b0] gap-4">
-                     <div className="w-1/3 pr-4">
+                     <div className="w-1/2 pr-6">
                         <p className="font-semibold text-white mb-2 text-[13px]">Invoice To</p>
                         <p className="font-semibold text-white">{data.customer.name}</p>
                         <p className="whitespace-pre-wrap mt-0.5">{data.customer.address}</p>
                      </div>
-                     <div className="w-1/3 pr-4">
+                     <div className="w-1/2 pr-6">
                         <p className="font-semibold text-white mb-2 text-[13px]">Shipped To</p>
                         <p className="font-semibold text-white">{data.shippedTo.name}</p>
                         <p className="whitespace-pre-wrap mt-0.5">{data.shippedTo.address}</p>
-                     </div>
-                     <div className="w-1/3">
-                        <p className="font-semibold text-white mb-2 text-[13px]">Purpose</p>
-                        <p className="whitespace-pre-wrap">{data.purpose}</p>
                      </div>
                   </div>
 
@@ -538,8 +528,8 @@ export default function App() {
                              </div>
                          )}
                          <div>
-                            <p className="font-semibold text-white mb-2">In Words</p>
-                            <p className="text-[#b0b0b0] max-w-[200px]">{numberToWords(total)}</p>
+                            <p className="font-semibold text-white mb-2">Purpose</p>
+                            <p className="text-[#b0b0b0] max-w-[200px] whitespace-pre-wrap">{data.purpose}</p>
                          </div>
                       </div>
                       
