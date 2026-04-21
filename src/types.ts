@@ -32,7 +32,6 @@ export interface DocumentData {
   currency: string;
   notes: string;
   paymentMethod: string;
-  internalAcNumber: string;
   upi?: string;
   paymentLink?: string;
   showQr: boolean;

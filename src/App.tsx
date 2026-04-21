@@ -64,7 +64,6 @@ const INITIAL_DATA: DocumentData = {
   currency: '₹',
   notes: '',
   paymentMethod: 'Cash',
-  internalAcNumber: '510101006820471',
   upi: 'innovustech@uboi',
   paymentLink: 'upi://pay?pa=dummy&pn=Dummy',
   showQr: true,
@@ -391,10 +390,6 @@ export default function App() {
                    <label className={labelCls}>Payment Method</label>
                    <input type="text" className={inputCls} value={data.paymentMethod} onChange={(e) => setData(p => ({...p, paymentMethod: e.target.value}))}/>
                 </div>
-                <div>
-                   <label className={labelCls}>Internal Ac Number</label>
-                   <input type="text" className={inputCls} value={data.internalAcNumber} onChange={(e) => setData(p => ({...p, internalAcNumber: e.target.value}))}/>
-                </div>
                 <div className="col-span-full md:col-span-1">
                    <label className={labelCls}>UPI / VPA</label>
                    <input type="text" className={inputCls} value={data.upi || ''} onChange={(e) => setData(p => ({...p, upi: e.target.value}))}/>
@@ -533,7 +528,15 @@ export default function App() {
                          <div>
                             <p className="font-semibold text-white mb-2">Payment Method</p>
                             <p className="text-[#b0b0b0]">{data.paymentMethod}</p>
+                            {data.upi && (
+                               <p className="text-[#b0b0b0] mt-1"><span className="text-white font-semibold">UPI:</span> {data.upi}</p>
+                            )}
                          </div>
+                         {data.showQr && data.paymentLink && (
+                             <div className="bg-white p-2 shrink-0 rounded-sm w-fit h-fit">
+                                 <QRCodeSVG value={data.paymentLink} size={64} level="L" marginSize={0} />
+                             </div>
+                         )}
                          <div>
                             <p className="font-semibold text-white mb-2">In Words</p>
                             <p className="text-[#b0b0b0] max-w-[200px]">{numberToWords(total)}</p>
@@ -546,29 +549,6 @@ export default function App() {
                              <span>{formatMoney(total)}</span>
                          </div>
                       </div>
-                  </div>
-
-                  {/* Footer Payment Info */}
-                  <div className="mt-auto pt-6 border-t border-[#333] flex justify-between items-start text-xs text-[#b0b0b0] pb-2">
-                     <div className="max-w-[60%]">
-                        <p className="font-semibold text-white text-[13px] mb-3">Internal / Reference Info</p>
-                        <div className="grid grid-cols-[80px_1fr] gap-y-1">
-                           <span className="font-semibold text-white">Ac #</span><span>{data.internalAcNumber}</span>
-                        </div>
-                     </div>
-                     
-                     <div className="flex flex-col items-end">
-                       {data.showQr && data.paymentLink && (
-                          <div className="bg-white p-2 shrink-0 mb-3 rounded-sm">
-                              <QRCodeSVG value={data.paymentLink} size={80} level="L" marginSize={0} />
-                          </div>
-                       )}
-                       {data.upi && (
-                           <div className="text-right">
-                              <p><span className="font-semibold text-white">UPI:</span> {data.upi}</p>
-                           </div>
-                       )}
-                     </div>
                   </div>
                </div>
             </div>
