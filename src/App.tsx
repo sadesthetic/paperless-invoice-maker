@@ -277,31 +277,12 @@ export default function App() {
             </div>
           </div>
 
-          <div className={sectionCls}>
-             <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Settings size={16}/> Document Setup</h2>
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                 <div>
-                    <label className={labelCls}>Number</label>
-                    <input type="text" className={inputCls} value={data.number} onChange={(e) => setData(p => ({...p, number: e.target.value}))}/>
-                 </div>
-                 <div className="col-span-full md:col-span-1 lg:col-span-2">
-                    <label className={labelCls}>Date & Time</label>
-                    <div className="flex gap-2">
-                       <input type="datetime-local" className={cn(inputCls, 'flex-1')} value={data.date} onChange={(e) => setData(p => ({...p, date: e.target.value}))}/>
-                       <button onClick={() => setData(p => ({...p, date: getNow()}))} title="Set to Current Time" className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2.5 rounded-lg border border-slate-200 transition-colors flex items-center justify-center shrink-0">
-                          <Clock size={16}/>
-                       </button>
-                    </div>
-                 </div>
-             </div>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className={sectionCls}>
                  <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><User size={16}/> Invoice To</h2>
                  <div>
                     <label className={labelCls}>Name</label>
-                    <input type="text" className={inputCls} value={data.customer.name} onChange={(e) => setData(p => ({...p, customer: {...p.customer, name: e.target.value}}))}/>
+                    <input type="text" className={inputCls} placeholder="e.g. John Doe" value={data.customer.name} onChange={(e) => setData(p => ({...p, customer: {...p.customer, name: e.target.value}}))}/>
                  </div>
                  <div>
                     <label className={labelCls}>Email</label>
@@ -314,7 +295,15 @@ export default function App() {
               </div>
 
               <div className={sectionCls}>
-                 <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Truck size={16}/> Shipped To</h2>
+                 <div className="flex justify-between items-center w-full">
+                     <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Truck size={16}/> Shipped To</h2>
+                     <button onClick={() => {
+                        setData(p => ({...p, shippedTo: { ...p.shippedTo, name: p.customer.name, address: p.customer.address }}));
+                        showToast("Copied from Invoice To");
+                     }} className="text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 active:scale-95">
+                        <Copy size={14}/> Copy
+                     </button>
+                 </div>
                  <div>
                     <label className={labelCls}>Name</label>
                     <input type="text" className={inputCls} value={data.shippedTo.name} onChange={(e) => setData(p => ({...p, shippedTo: {...p.shippedTo, name: e.target.value}}))}/>
@@ -324,6 +313,38 @@ export default function App() {
                     <textarea className={textareaCls} value={data.shippedTo.address} onChange={(e) => setData(p => ({...p, shippedTo: {...p.shippedTo, address: e.target.value}}))}/>
                  </div>
               </div>
+          </div>
+
+          <div className={sectionCls}>
+             <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Settings size={16}/> Document Setup</h2>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                 <div className="col-span-full md:col-span-1">
+                    <label className={labelCls}>Number</label>
+                    <div className="flex gap-2">
+                        <input type="text" className={cn(inputCls, 'flex-1')} value={data.number} onChange={(e) => setData(p => ({...p, number: e.target.value}))}/>
+                        <button onClick={() => {
+                            if (!data.customer.name) {
+                                showToast("Enter 'Invoice To' Name first!");
+                                return;
+                            }
+                            const letter = data.customer.name.charAt(0).toUpperCase();
+                            const rand = Math.floor(10000 + Math.random() * 90000);
+                            setData(p => ({...p, number: `${letter}${rand}`}));
+                        }} title="Auto Generate" className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2.5 rounded-lg border border-slate-200 transition-colors flex items-center justify-center shrink-0 text-xs font-bold tracking-wider uppercase">
+                            Auto
+                        </button>
+                    </div>
+                 </div>
+                 <div className="col-span-full md:col-span-1 lg:col-span-2">
+                    <label className={labelCls}>Date & Time</label>
+                    <div className="flex gap-2">
+                       <input type="datetime-local" className={cn(inputCls, 'flex-1')} value={data.date} onChange={(e) => setData(p => ({...p, date: e.target.value}))}/>
+                       <button onClick={() => setData(p => ({...p, date: getNow()}))} title="Set to Current Time" className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2.5 rounded-lg border border-slate-200 transition-colors flex items-center justify-center shrink-0">
+                          <Clock size={16}/>
+                       </button>
+                    </div>
+                 </div>
+             </div>
           </div>
 
           <div className={sectionCls}>
