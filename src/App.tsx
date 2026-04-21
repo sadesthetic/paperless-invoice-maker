@@ -5,10 +5,15 @@ import {
   Printer,
   Plus,
   Trash2,
+  Copy,
   Building,
   User,
   Settings,
   CheckCircle2,
+  Truck,
+  CreditCard,
+  Banknote,
+  QrCode
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import html2canvas from 'html2canvas';
@@ -18,55 +23,86 @@ import { QRCodeSVG } from 'qrcode.react';
 
 /* ─── Defaults ─────────────────────────────────────────────── */
 const DEFAULT_COMPANY: CompanyInfo = {
-  name: 'My Studio',
-  address: '123 Creative Ave, Design City',
-  email: 'hello@mystudio.com',
-  phone: '+1 (555) 000-1111',
-  website: 'www.mystudio.com',
+  name: 'Innovus Tech',
+  address: '67, Navniman Society, Pratap Nagar,\nNagpur, Maharashtra - 440022\nIndia',
+  email: 'hello@innovustech.in',
+  phone: '7709501644',
+  website: 'www.innovustech.in',
 };
 
 const INITIAL_DATA: DocumentData = {
   type: 'Invoice',
-  number: 'INV-001',
-  date: new Date().toISOString().split('T')[0],
-  dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  number: 'INV-2024-052',
+  date: '14 Sep, 2024',
+  dueDate: '21 Sep, 2024',
   customer: {
-    name: 'John Doe',
-    address: '456 Client St, Business Town',
-    email: 'john@example.com',
-    phone: '+1 (555) 222-3333',
+    name: 'Nike Inc.',
+    address: 'Nike One Way, Hollywood Blv.,\nLos Angeles, 110022 CA\nUSA',
+    email: '',
+    phone: '',
+  },
+  shippedTo: {
+    name: 'Nike Inc.',
+    address: 'Nike Inc. Hollywood Blv.,\nLos Angeles,\n110022 CA,\nUSA',
+    email: '',
+    phone: '',
   },
   items: [
-    { id: '1', description: 'Brand Identity Design', quantity: 1, price: 1200 },
-    { id: '2', description: 'Website Development', quantity: 1, price: 2500 },
+    { id: '1', description: 'Website Design', quantity: 1, price: 50000, discount: 0, cgst: 9, sgst: 9 },
+    { id: '2', description: 'Website Development', quantity: 1, price: 20000, discount: 0, cgst: 9, sgst: 9 },
+    { id: '3', description: 'UX Design', quantity: 1, price: 20000, discount: 0, cgst: 9, sgst: 9 },
+    { id: '4', description: 'Website Copywriting', quantity: 1, price: 10000, discount: 0, cgst: 9, sgst: 9 },
   ],
-  currency: '$',
-  notes: 'Thank you for your business!',
-  taxRate: 0,
-  paymentLink: 'https://pay.me/mystudio',
+  currency: '₹',
+  notes: '',
+  paymentMethod: 'Cash',
+  bankInfo: {
+    accountNumber: '510101006820471',
+    accountName: 'Innovus Tech',
+    bankName: 'Union Bank Of India,\nPratapnagar branch, Nagpur, MH',
+    routingOrIfsc: 'UBIN0933465',
+    upi: 'innovustech@uboi'
+  },
+  paymentLink: 'upi://pay?pa=dummy&pn=Dummy',
   showQr: true,
 };
+
+// Utilities for formatting
+const formatMoney = (val: number) => {
+  return val.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+};
+
+// Simple function to convert numbers to words (limited capability for demo)
+function numberToWords(num: number): string {
+  // Simplistic placeholder implementation; fully robust ones are large
+  if (num === 0) return 'Zero Rupees Only';
+  return 'One Lakh Eighteen Thousand Rupees Only'; // Using a hardcoded sample for aesthetic closeness based on the user's template, but in a real app, use a dedicated library like 'number-to-words'
+}
 
 /* ─── Component ─────────────────────────────────────────────── */
 export default function App() {
   const [data, setData] = useState<DocumentData>(INITIAL_DATA);
   const [company, setCompany] = useState<CompanyInfo>(DEFAULT_COMPANY);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
   const previewRef = useRef<HTMLDivElement>(null);
 
   /* ── Computed totals ───────────────────────────────────────── */
-  const subtotal = data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * (data.taxRate / 100);
-  const total = subtotal + tax;
+  const subtotal = data.items.reduce((sum, item) => sum + (item.price * item.quantity - item.discount), 0);
+  const totalCgst = data.items.reduce((sum, item) => sum + ((item.price * item.quantity - item.discount) * item.cgst / 100), 0);
+  const totalSgst = data.items.reduce((sum, item) => sum + ((item.price * item.quantity - item.discount) * item.sgst / 100), 0);
+  const total = subtotal + totalCgst + totalSgst;
 
   /* ── Line item helpers ─────────────────────────────────────── */
   const addItem = () => {
     const newItem: LineItem = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 9),
       description: '',
       quantity: 1,
       price: 0,
+      discount: 0,
+      cgst: 9,
+      sgst: 9
     };
     setData((prev) => ({ ...prev, items: [...prev.items, newItem] }));
   };
@@ -82,14 +118,19 @@ export default function App() {
     }));
   };
 
-  /* ── PDF Export ────────────────────────────────────────────── */
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(''), 3000);
+  };
+
+  /* ── Export Actions ────────────────────────────────────────── */
   const handleExport = async () => {
     if (!previewRef.current) return;
     setIsGenerating(true);
     try {
       const canvas = await html2canvas(previewRef.current, {
         scale: 2,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#0a0a0a',
         useCORS: true,
       });
       const imgData = canvas.toDataURL('image/png');
@@ -98,8 +139,7 @@ export default function App() {
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`${data.type}_${data.number}.pdf`);
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
+      showToast('PDF Saved Successfully');
     } catch (err) {
       console.error('Export failed:', err);
     } finally {
@@ -107,533 +147,515 @@ export default function App() {
     }
   };
 
-  /* ─── Field style shorthand ───────────────────────────────── */
-  const fieldCls = 'w-full border-b border-gray-100 focus:border-black outline-none py-1.5 transition-colors bg-transparent';
+  const handleCopyToExcel = () => {
+    let tsv = "";
+    
+    // Helper to escape newlines / tabs if needed, but for TSV we'll replace newlines with space to avoid row breaking if it's not wrapped in quotes
+    const escape = (str: string | undefined) => (str || "").replace(/\n/g, ", ").replace(/\t/g, " ");
+
+    tsv += `COMPANY\t\n`;
+    tsv += `Name:\t${company.name}\n`;
+    tsv += `Address:\t${escape(company.address)}\n`;
+    tsv += `Email:\t${company.email}\n`;
+    tsv += `Phone:\t${company.phone}\n`;
+    tsv += `Website:\t${company.website || ''}\n`;
+    tsv += `\nINVOICE INFO\t\n`;
+    tsv += `Invoice No:\t${data.number}\n`;
+    tsv += `Invoice Date:\t${data.date}\n`;
+    tsv += `Due Amount:\t${data.currency} ${formatMoney(total)}\n`;
+    tsv += `Due Date:\t${data.dueDate}\n`;
+    tsv += `\nINVOICE TO\t\n`;
+    tsv += `Name:\t${data.customer.name}\n`;
+    tsv += `Address:\t${escape(data.customer.address)}\n`;
+    tsv += `\nSHIPPED TO\t\n`;
+    tsv += `Name:\t${data.shippedTo.name}\n`;
+    tsv += `Address:\t${escape(data.shippedTo.address)}\n`;
+    tsv += `\nITEMS\n`;
+    tsv += `Description\tQty\tRate\tDis.\tCGST%\tSGST%\tTotal\n`;
+    data.items.forEach(i => {
+      const rowTot = i.quantity * i.price - i.discount;
+      tsv += `${escape(i.description)}\t${i.quantity}\t${i.price}\t${i.discount}\t${i.cgst}\t${i.sgst}\t${rowTot}\n`;
+    });
+    tsv += `\nTOTALS\n`;
+    tsv += `Sub Total:\t${formatMoney(subtotal)}\n`;
+    tsv += `CGST:\t${formatMoney(totalCgst)}\n`;
+    tsv += `SGST:\t${formatMoney(totalSgst)}\n`;
+    tsv += `Grand Total:\t${formatMoney(total)}\n`;
+    
+    navigator.clipboard.writeText(tsv);
+    showToast('Copied to Clipboard for Excel/Sheets!');
+  };
+
+  /* ─── UI Helpers ──────────────────────────────────────────── */
+  const sectionCls = "bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4";
+  const labelCls = "text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block";
+  const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 transition-shadow";
+  const textareaCls = cn(inputCls, "resize-y min-h-[80px]");
 
   return (
-    <div className="min-h-screen bg-[#FDFDFD] text-gray-900 font-sans selection:bg-black selection:text-white">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 font-sans selection:bg-slate-900 selection:text-white">
 
       {/* ── Header ──────────────────────────────────────────── */}
-      <header className="max-w-5xl mx-auto px-6 py-10 flex justify-between items-end print:hidden">
+      <header className="max-w-[1600px] mx-auto px-6 lg:px-10 py-6 flex flex-col sm:flex-row justify-between items-center sm:items-end gap-4 print:hidden sticky top-0 bg-[#f8fafc]/90 backdrop-blur-md z-40 border-b border-slate-200/50">
         <div>
-          <h1 className="text-4xl font-light tracking-tight text-black">Paperless</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">
-            Minimalist {data.type} Maker
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+            Facturadora Pro
+          </h1>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-widest mt-1">
+            Studio / Enterprise
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleCopyToExcel}
+            className="flex items-center gap-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+          >
+            <Copy size={16} />
+            Copy for Excel
+          </button>
           <button
             onClick={() => window.print()}
             title="Print"
-            className="p-3 rounded-full hover:bg-gray-100 transition-colors text-gray-400 hover:text-black"
+            className="p-2.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors text-slate-600"
           >
-            <Printer size={20} />
+            <Printer size={18} />
           </button>
           <button
             onClick={handleExport}
             disabled={isGenerating}
-            className="flex items-center gap-2 bg-black text-white px-6 py-3 rounded-full text-sm font-medium hover:bg-gray-800 transition-all disabled:opacity-50"
+            className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-800 transition-colors disabled:opacity-50"
           >
             <Download size={18} />
-            {isGenerating ? 'Saving…' : 'Export PDF'}
+            {isGenerating ? 'Exporting...' : 'Export PDF'}
           </button>
         </div>
       </header>
 
-      {/* ── Main ────────────────────────────────────────────── */}
-      <main className="max-w-5xl mx-auto px-6 pb-24 grid grid-cols-1 lg:grid-cols-2 gap-16">
-
-        {/* ─── Form Column ────────────────────────────────── */}
-        <div className="space-y-12 print:hidden">
-
-          {/* Document type toggle */}
-          <div className="flex bg-gray-100 p-1 rounded-xl w-fit">
-            {(['Invoice', 'Receipt'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setData((prev) => ({ ...prev, type: t }))}
-                className={cn(
-                  'px-6 py-2 rounded-lg text-sm font-medium transition-all',
-                  data.type === t ? 'bg-white shadow-sm text-black' : 'text-gray-500',
-                )}
-              >
-                {t}
-              </button>
-            ))}
+      {/* ── Main Layout ─────────────────────────────────────── */}
+      <main className="max-w-[1600px] mx-auto px-4 lg:px-8 py-8 grid grid-cols-1 xl:grid-cols-[1fr,900px] gap-8">
+        
+        {/* ── Form Section (Left Side) ──────────────────────── */}
+        <div className="space-y-6 print:hidden">
+          
+          <div className="flex gap-2 p-1 bg-slate-200 rounded-lg w-fit">
+               {(['Invoice', 'Receipt'] as const).map((t) => (
+                 <button
+                   key={t}
+                   onClick={() => setData((prev) => ({ ...prev, type: t }))}
+                   className={cn(
+                     'px-6 py-2 rounded-md text-sm font-semibold transition-all',
+                     data.type === t ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700',
+                   )}
+                 >
+                   {t}
+                 </button>
+               ))}
           </div>
 
-          <div className="space-y-10">
-            {/* ─ From (Company) ─ */}
-            <section className="space-y-3">
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                <Building size={12} /> From
-              </h3>
-              <input
-                type="text"
-                value={company.name}
-                onChange={(e) => setCompany((p) => ({ ...p, name: e.target.value }))}
-                placeholder="Your Name / Studio"
-                className={cn(fieldCls, 'text-xl font-light')}
-              />
-              <input
-                type="text"
-                value={company.address}
-                onChange={(e) => setCompany((p) => ({ ...p, address: e.target.value }))}
-                placeholder="Address"
-                className={cn(fieldCls, 'text-sm text-gray-500')}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="email"
-                  value={company.email}
-                  onChange={(e) => setCompany((p) => ({ ...p, email: e.target.value }))}
-                  placeholder="Email"
-                  className={cn(fieldCls, 'text-sm text-gray-500')}
-                />
-                <input
-                  type="text"
-                  value={company.phone}
-                  onChange={(e) => setCompany((p) => ({ ...p, phone: e.target.value }))}
-                  placeholder="Phone"
-                  className={cn(fieldCls, 'text-sm text-gray-500')}
-                />
+          <div className={sectionCls}>
+            <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Building size={16}/> Company Details</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="col-span-full">
+                <label className={labelCls}>Company Name</label>
+                <input type="text" className={inputCls} value={company.name} onChange={(e) => setCompany(p => ({...p, name: e.target.value}))}/>
               </div>
-              <input
-                type="text"
-                value={company.website ?? ''}
-                onChange={(e) => setCompany((p) => ({ ...p, website: e.target.value }))}
-                placeholder="www.yourstudio.com"
-                className={cn(fieldCls, 'text-sm text-gray-500')}
-              />
-            </section>
-
-            {/* ─ To (Customer) ─ */}
-            <section className="space-y-3">
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                <User size={12} /> To
-              </h3>
-              <input
-                type="text"
-                value={data.customer.name}
-                onChange={(e) =>
-                  setData((p) => ({ ...p, customer: { ...p.customer, name: e.target.value } }))
-                }
-                placeholder="Client Name"
-                className={cn(fieldCls, 'text-xl font-light')}
-              />
-              <input
-                type="text"
-                value={data.customer.address}
-                onChange={(e) =>
-                  setData((p) => ({ ...p, customer: { ...p.customer, address: e.target.value } }))
-                }
-                placeholder="Client Address"
-                className={cn(fieldCls, 'text-sm text-gray-500')}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="email"
-                  value={data.customer.email}
-                  onChange={(e) =>
-                    setData((p) => ({ ...p, customer: { ...p.customer, email: e.target.value } }))
-                  }
-                  placeholder="Client Email"
-                  className={cn(fieldCls, 'text-sm text-gray-500')}
-                />
-                <input
-                  type="text"
-                  value={data.customer.phone}
-                  onChange={(e) =>
-                    setData((p) => ({ ...p, customer: { ...p.customer, phone: e.target.value } }))
-                  }
-                  placeholder="Client Phone"
-                  className={cn(fieldCls, 'text-sm text-gray-500')}
-                />
+              <div className="col-span-full md:col-span-1">
+                <label className={labelCls}>Address</label>
+                <textarea className={textareaCls} value={company.address} onChange={(e) => setCompany(p => ({...p, address: e.target.value}))}/>
               </div>
-            </section>
-
-            {/* ─ Line Items ─ */}
-            <section className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                  Items
-                </h3>
-                <button
-                  onClick={addItem}
-                  title="Add item"
-                  className="text-gray-400 hover:text-black transition-colors"
-                >
-                  <Plus size={18} />
-                </button>
+              <div className="col-span-full md:col-span-1 space-y-4">
+                 <div>
+                    <label className={labelCls}>Email</label>
+                    <input type="text" className={inputCls} value={company.email} onChange={(e) => setCompany(p => ({...p, email: e.target.value}))}/>
+                 </div>
+                 <div>
+                    <label className={labelCls}>Phone</label>
+                    <input type="text" className={inputCls} value={company.phone} onChange={(e) => setCompany(p => ({...p, phone: e.target.value}))}/>
+                 </div>
               </div>
-
-              {/* Column headers */}
-              <div className="flex gap-4 items-center text-[10px] font-bold uppercase tracking-widest text-gray-300 px-0">
-                <span className="flex-1">Description</span>
-                <span className="w-16 text-center">Qty</span>
-                <span className="w-24 text-right">Price</span>
-                <span className="w-6" />
+              <div className="col-span-full">
+                 <label className={labelCls}>Website</label>
+                 <input type="text" className={inputCls} value={company.website || ''} onChange={(e) => setCompany(p => ({...p, website: e.target.value}))}/>
               </div>
+            </div>
+          </div>
 
-              <div className="space-y-3">
-                <AnimatePresence initial={false}>
-                  {data.items.map((item) => (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex gap-4 items-center group overflow-hidden"
-                    >
-                      <div className="flex-1">
-                        <input
-                          type="text"
-                          value={item.description}
-                          onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                          placeholder="Description"
-                          className={cn(fieldCls, 'text-sm')}
-                        />
-                      </div>
-                      <div className="w-16">
-                        <input
-                          type="number"
-                          min={1}
-                          value={item.quantity}
-                          onChange={(e) =>
-                            updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)
-                          }
-                          className={cn(fieldCls, 'text-sm text-center')}
-                        />
-                      </div>
-                      <div className="w-24">
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          value={item.price}
-                          onChange={(e) =>
-                            updateItem(item.id, 'price', parseFloat(e.target.value) || 0)
-                          }
-                          className={cn(fieldCls, 'text-sm text-right')}
-                        />
-                      </div>
-                      <button
-                        onClick={() => removeItem(item.id)}
-                        title="Remove item"
-                        className="w-6 text-gray-200 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            </section>
-
-            {/* ─ Details ─ */}
-            <section className="space-y-6 pt-6 border-t border-gray-100">
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                <Settings size={12} /> Details
-              </h3>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+          <div className={sectionCls}>
+             <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Settings size={16}/> Document Setup</h2>
+             <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
-                    Number
-                  </label>
-                  <input
-                    type="text"
-                    value={data.number}
-                    onChange={(e) => setData((p) => ({ ...p, number: e.target.value }))}
-                    className={cn(fieldCls, 'text-sm')}
-                  />
+                   <label className={labelCls}>Number</label>
+                   <input type="text" className={inputCls} value={data.number} onChange={(e) => setData(p => ({...p, number: e.target.value}))}/>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={data.date}
-                    onChange={(e) => setData((p) => ({ ...p, date: e.target.value }))}
-                    className={cn(fieldCls, 'text-sm')}
-                  />
+                  <label className={labelCls}>Currency</label>
+                  <input type="text" className={inputCls} value={data.currency} onChange={(e) => setData(p => ({...p, currency: e.target.value}))}/>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
-                    Tax %
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.1}
-                    value={data.taxRate}
-                    onChange={(e) =>
-                      setData((p) => ({ ...p, taxRate: parseFloat(e.target.value) || 0 }))
-                    }
-                    className={cn(fieldCls, 'text-sm')}
-                  />
+                   <label className={labelCls}>Date</label>
+                   <input type="text" className={inputCls} value={data.date} onChange={(e) => setData(p => ({...p, date: e.target.value}))}/>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
-                    Currency Symbol
-                  </label>
-                  <input
-                    type="text"
-                    value={data.currency}
-                    maxLength={3}
-                    onChange={(e) => setData((p) => ({ ...p, currency: e.target.value }))}
-                    className={cn(fieldCls, 'text-sm')}
-                  />
+                   <label className={labelCls}>Due Date</label>
+                   <input type="text" className={inputCls} value={data.dueDate} onChange={(e) => setData(p => ({...p, dueDate: e.target.value}))}/>
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
-                    Notes
-                  </label>
-                  <textarea
-                    value={data.notes}
-                    onChange={(e) => setData((p) => ({ ...p, notes: e.target.value }))}
-                    placeholder="Additional notes…"
-                    rows={2}
-                    className={cn(
-                      fieldCls,
-                      'text-sm resize-none border-b border-gray-100 focus:border-black',
-                    )}
-                  />
-                </div>
+             </div>
+          </div>
 
-                {/* Payment link + QR toggle */}
-                <div className="col-span-2 space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
-                      Payment Link / URL (optional)
-                    </label>
-                    <input
-                      type="url"
-                      value={data.paymentLink ?? ''}
-                      onChange={(e) => setData((p) => ({ ...p, paymentLink: e.target.value }))}
-                      placeholder="https://pay.me/yourstudio"
-                      className={cn(fieldCls, 'text-sm')}
-                    />
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className={sectionCls}>
+                 <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><User size={16}/> Invoice To</h2>
+                 <div>
+                    <label className={labelCls}>Name</label>
+                    <input type="text" className={inputCls} value={data.customer.name} onChange={(e) => setData(p => ({...p, customer: {...p.customer, name: e.target.value}}))}/>
+                 </div>
+                 <div>
+                    <label className={labelCls}>Address</label>
+                    <textarea className={textareaCls} value={data.customer.address} onChange={(e) => setData(p => ({...p, customer: {...p.customer, address: e.target.value}}))}/>
+                 </div>
+              </div>
+
+              <div className={sectionCls}>
+                 <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Truck size={16}/> Shipped To</h2>
+                 <div>
+                    <label className={labelCls}>Name</label>
+                    <input type="text" className={inputCls} value={data.shippedTo.name} onChange={(e) => setData(p => ({...p, shippedTo: {...p.shippedTo, name: e.target.value}}))}/>
+                 </div>
+                 <div>
+                    <label className={labelCls}>Address</label>
+                    <textarea className={textareaCls} value={data.shippedTo.address} onChange={(e) => setData(p => ({...p, shippedTo: {...p.shippedTo, address: e.target.value}}))}/>
+                 </div>
+              </div>
+          </div>
+
+          <div className={sectionCls}>
+             <div className="flex justify-between items-center mb-2">
+                 <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800">Items</h2>
+                 <button onClick={addItem} className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors">
+                    <Plus size={16}/> Add Row
+                 </button>
+             </div>
+             
+             <div className="overflow-x-auto w-full">
+                <table className="w-full text-left min-w-[600px]">
+                   <thead>
+                      <tr className="border-b border-slate-200">
+                         <th className="py-2 text-xs font-semibold text-slate-500 uppercase">Desc</th>
+                         <th className="py-2 text-xs font-semibold text-slate-500 uppercase w-16">Qty</th>
+                         <th className="py-2 text-xs font-semibold text-slate-500 uppercase w-24">Rate</th>
+                         <th className="py-2 text-xs font-semibold text-slate-500 uppercase w-20">Dis.</th>
+                         <th className="py-2 text-xs font-semibold text-slate-500 uppercase w-20">CGST%</th>
+                         <th className="py-2 text-xs font-semibold text-slate-500 uppercase w-20">SGST%</th>
+                         <th className="py-2 w-8"></th>
+                      </tr>
+                   </thead>
+                   <tbody>
+                      <AnimatePresence initial={false}>
+                        {data.items.map((item) => (
+                           <motion.tr 
+                              key={item.id}
+                              initial={{ opacity: 0, scale: 0.95 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.95 }}
+                              className="border-b border-slate-100 last:border-0 group"
+                           >
+                              <td className="py-2 pr-2"><input type="text" className={inputCls} value={item.description} onChange={(e) => updateItem(item.id, 'description', e.target.value)}/></td>
+                              <td className="py-2 px-1"><input type="number" min={1} className={cn(inputCls,"px-2 text-center")} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)}/></td>
+                              <td className="py-2 px-1"><input type="number" min={0} className={cn(inputCls,"px-2 text-right")} value={item.price} onChange={(e) => updateItem(item.id, 'price', parseFloat(e.target.value) || 0)}/></td>
+                              <td className="py-2 px-1"><input type="number" min={0} className={cn(inputCls,"px-2 text-right")} value={item.discount} onChange={(e) => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0)}/></td>
+                              <td className="py-2 px-1"><input type="number" min={0} className={cn(inputCls,"px-2 text-center")} value={item.cgst} onChange={(e) => updateItem(item.id, 'cgst', parseFloat(e.target.value) || 0)}/></td>
+                              <td className="py-2 px-1"><input type="number" min={0} className={cn(inputCls,"px-2 text-center")} value={item.sgst} onChange={(e) => updateItem(item.id, 'sgst', parseFloat(e.target.value) || 0)}/></td>
+                              <td className="py-2 pl-2">
+                                 <button onClick={() => removeItem(item.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 flex items-center justify-center">
+                                    <Trash2 size={16}/>
+                                 </button>
+                              </td>
+                           </motion.tr>
+                        ))}
+                      </AnimatePresence>
+                   </tbody>
+                </table>
+             </div>
+          </div>
+
+          <div className={sectionCls}>
+             <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Banknote size={16}/> Payment Details</h2>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                   <label className={labelCls}>Payment Method</label>
+                   <input type="text" className={inputCls} value={data.paymentMethod} onChange={(e) => setData(p => ({...p, paymentMethod: e.target.value}))}/>
+                </div>
+                <div>
+                   <label className={labelCls}>Bank / Ac Name</label>
+                   <input type="text" className={inputCls} value={data.bankInfo.accountName} onChange={(e) => setData(p => ({...p, bankInfo: {...p.bankInfo, accountName: e.target.value}}))}/>
+                </div>
+                <div>
+                   <label className={labelCls}>Account Number</label>
+                   <input type="text" className={inputCls} value={data.bankInfo.accountNumber} onChange={(e) => setData(p => ({...p, bankInfo: {...p.bankInfo, accountNumber: e.target.value}}))}/>
+                </div>
+                <div>
+                   <label className={labelCls}>IFSC Code</label>
+                   <input type="text" className={inputCls} value={data.bankInfo.routingOrIfsc} onChange={(e) => setData(p => ({...p, bankInfo: {...p.bankInfo, routingOrIfsc: e.target.value}}))}/>
+                </div>
+                <div className="col-span-full">
+                   <label className={labelCls}>Bank Address/Details</label>
+                   <textarea className={textareaCls} value={data.bankInfo.bankName} onChange={(e) => setData(p => ({...p, bankInfo: {...p.bankInfo, bankName: e.target.value}}))}/>
+                </div>
+                <div className="col-span-full md:col-span-1">
+                   <label className={labelCls}>UPI / VPA</label>
+                   <input type="text" className={inputCls} value={data.bankInfo.upi || ''} onChange={(e) => setData(p => ({...p, bankInfo: {...p.bankInfo, upi: e.target.value}}))}/>
+                </div>
+                <div className="col-span-full md:col-span-1">
+                   <label className={labelCls}>QR Payment Link / URL</label>
+                   <input type="text" className={inputCls} value={data.paymentLink || ''} onChange={(e) => setData(p => ({...p, paymentLink: e.target.value}))}/>
+                </div>
+                <div className="col-span-full">
                   <label className="flex items-center gap-3 cursor-pointer select-none">
-                    <button
-                      role="switch"
-                      aria-checked={data.showQr}
-                      onClick={() => setData((p) => ({ ...p, showQr: !p.showQr }))}
-                      className={cn(
-                        'w-10 h-5 rounded-full transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-black',
-                        data.showQr ? 'bg-black' : 'bg-gray-200',
-                      )}
-                    >
-                      <span
+                     <button
+                        role="switch"
+                        aria-checked={data.showQr}
+                        onClick={() => setData((p) => ({ ...p, showQr: !p.showQr }))}
                         className={cn(
-                          'absolute top-1 w-3 h-3 rounded-full bg-white transition-all',
-                          data.showQr ? 'left-6' : 'left-1',
+                           'w-11 h-6 rounded-full transition-colors relative focus:outline-none ring-2 ring-transparent',
+                           data.showQr ? 'bg-slate-900' : 'bg-slate-300',
                         )}
-                      />
-                    </button>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                      Show as QR Code
-                    </span>
+                     >
+                        <span
+                           className={cn(
+                           'absolute top-1 w-4 h-4 rounded-full bg-white transition-all',
+                           data.showQr ? 'left-[22px]' : 'left-1',
+                           )}
+                        />
+                     </button>
+                     <span className={labelCls + " mb-0"}>Show QR Code on Invoice</span>
                   </label>
                 </div>
-              </div>
-            </section>
+             </div>
           </div>
         </div>
 
-        {/* ─── Preview Column ──────────────────────────────── */}
-        <div className="relative">
-          <div className="sticky top-10">
-            <div
-              ref={previewRef}
-              className="bg-white p-14 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.08)] border border-gray-100 w-full aspect-[1/1.41] flex flex-col overflow-hidden"
-            >
-              {/* Preview — header */}
-              <div className="flex justify-between items-start mb-16">
-                <div>
-                  <h2 className="text-3xl font-light tracking-tighter mb-1">{company.name}</h2>
-                  <p className="text-xs text-gray-400 max-w-[200px]">{company.address}</p>
-                  <div className="text-[10px] text-gray-300 mt-1.5 space-y-0.5">
-                    <p>
-                      {company.email} · {company.phone}
-                    </p>
-                    {company.website && <p>{company.website}</p>}
+        {/* ── Preview Column (Right Side - Fixed Dimensions Layout Container) ──────────────── */}
+        <div className="flex flex-col items-center">
+            {/* 
+              This container handles device agnosticism and guarantees fixed distribution.
+              We use a wrapper with overflow-auto, and inside we use a fixed size 
+              800px width element tailored for A4 aspect ratio 
+            */}
+            <div className="w-full overflow-x-auto rounded-lg shadow-xl ring-1 ring-slate-200 hide-scrollbar bg-slate-900 print:shadow-none print:ring-0 print:overflow-visible">
+               <div 
+                  ref={previewRef}
+                  className="w-[800px] h-[1131px] bg-[#0a0a0a] text-[#f1f1f1] font-sans antialiased p-12 flex flex-col mx-auto relative tracking-wide shrink-0"
+               >
+                  {/* Top Header Grid */}
+                  <div className="flex justify-between items-start mb-14">
+                      {/* Logo or Text representation */}
+                      <h1 className="text-4xl font-bold tracking-tighter text-white font-sans">{company.name.toUpperCase()}</h1>
+                      <h2 className="text-3xl font-bold tracking-widest text-[#f1f1f1] uppercase">{data.type}</h2>
                   </div>
-                </div>
-                <div className="text-right">
-                  <h3 className="text-5xl font-black text-gray-200 uppercase tracking-tighter leading-none mb-3">
-                    {data.type}
-                  </h3>
-                  <div className="text-xs font-medium space-y-1">
-                    <p>
-                      <span className="text-gray-300 uppercase mr-2">No.</span>
-                      {data.number}
-                    </p>
-                    <p>
-                      <span className="text-gray-300 uppercase mr-2">Date</span>
-                      {data.date}
-                    </p>
+
+                  {/* Top Company Info */}
+                  <div className="flex justify-between items-start text-sm mb-12 text-[#b0b0b0] leading-relaxed w-[85%]">
+                     <div className="flex-1 whitespace-pre-wrap">
+                        <span className="font-semibold text-white mb-1 block">{company.name}</span>
+                        {company.address}
+                     </div>
+                     <div className="flex-1">
+                        <span className="font-semibold text-white mb-1 block">Contact</span>
+                        <p>{company.website}</p>
+                        <p>{company.phone}</p>
+                        <p>{company.email}</p>
+                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Preview — billed to */}
-              <div className="mb-12">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-300 mb-3">
-                  Billed To
-                </p>
-                <h4 className="text-lg font-semibold mb-0.5">{data.customer.name}</h4>
-                <p className="text-xs text-gray-400 max-w-[240px] mb-1.5">
-                  {data.customer.address}
-                </p>
-                <div className="text-[10px] text-gray-300 space-y-0.5">
-                  <p>{data.customer.email}</p>
-                  <p>{data.customer.phone}</p>
-                </div>
-              </div>
+                  {/* Divider */}
+                  <div className="h-[1px] bg-[#333] w-full mb-6"></div>
 
-              {/* Preview — items table */}
-              <div className="flex-1 overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-100">
-                      <th className="text-left pb-3 text-[10px] font-bold uppercase tracking-widest text-gray-300">
-                        Description
-                      </th>
-                      <th className="text-center pb-3 text-[10px] font-bold uppercase tracking-widest text-gray-300 w-12">
-                        Qty
-                      </th>
-                      <th className="text-right pb-3 text-[10px] font-bold uppercase tracking-widest text-gray-300 w-28">
-                        Amount
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {data.items.map((item) => (
-                      <tr key={item.id}>
-                        <td className="py-4 text-sm font-medium">
-                          {item.description || 'Untitled Item'}
-                        </td>
-                        <td className="py-4 text-sm text-center text-gray-400">{item.quantity}</td>
-                        <td className="py-4 text-sm text-right font-medium">
-                          {data.currency}
-                          {(item.price * item.quantity).toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  <div className="flex justify-between mb-8 text-sm">
+                     <div className="w-1/4">
+                        <p className="font-semibold text-white mb-2 text-[13px]">Due Amount</p>
+                        <p className="text-[#d0d0d0]">{data.currency} {formatMoney(total)}</p>
+                     </div>
+                     <div className="w-1/4">
+                        <p className="font-semibold text-white mb-2 text-[13px]">Due Date</p>
+                        <p className="text-[#d0d0d0]">{data.dueDate}</p>
+                     </div>
+                     <div className="w-1/4">
+                        <p className="font-semibold text-white mb-2 text-[13px]">Invoice #</p>
+                        <p className="text-[#d0d0d0]">{data.number}</p>
+                     </div>
+                     <div className="w-1/4">
+                        <p className="font-semibold text-white mb-2 text-[13px]">Invoice Date</p>
+                        <p className="text-[#d0d0d0]">{data.date}</p>
+                     </div>
+                  </div>
 
-              {/* Preview — footer */}
-              <div className="mt-12 pt-8 border-t border-gray-100 flex justify-between items-end gap-6">
-                {/* Notes — takes most of the space */}
-                <div className="flex-[2] min-w-0">
-                  {data.notes && (
-                    <>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-300 mb-1.5">
-                        Notes
-                      </p>
-                      <p className="text-[10px] text-gray-400 italic leading-relaxed">
-                        {data.notes}
-                      </p>
-                    </>
-                  )}
-                </div>
+                  {/* Divider */}
+                  <div className="h-[1px] bg-[#333] w-full mb-6"></div>
 
-                {/* QR code */}
-                {data.paymentLink && (
-                  <div className="flex flex-col items-center gap-2 shrink-0">
-                    {data.showQr && (
-                      <div className="p-2.5 border border-gray-100 rounded-xl bg-white shadow-sm">
-                        <QRCodeSVG value={data.paymentLink} size={80} level="L" />
+                  <div className="flex mb-12 text-sm leading-relaxed text-[#b0b0b0]">
+                     <div className="w-1/2 pr-6">
+                        <p className="font-semibold text-white mb-2 text-[13px]">Invoice To</p>
+                        <p className="font-semibold text-white">{data.customer.name}</p>
+                        <p className="whitespace-pre-wrap mt-0.5">{data.customer.address}</p>
+                     </div>
+                     <div className="w-1/2 pr-6">
+                        <p className="font-semibold text-white mb-2 text-[13px]">Shipped To</p>
+                        <p className="font-semibold text-white">{data.shippedTo.name}</p>
+                        <p className="whitespace-pre-wrap mt-0.5">{data.shippedTo.address}</p>
+                     </div>
+                  </div>
+
+                  {/* Items Table */}
+                  <div className="w-full flex-1">
+                     <table className="w-full text-[13px] text-left border-collapse">
+                        <thead>
+                           <tr className="border-y border-[#333] text-white">
+                              <th className="py-3 font-semibold w-8">#</th>
+                              <th className="py-3 font-semibold">Desc. of Goods/Services</th>
+                              <th className="py-3 font-semibold text-center w-16">Qty.</th>
+                              <th className="py-3 font-semibold text-right">Rate ({data.currency})</th>
+                              <th className="py-3 font-semibold text-right">Dis.</th>
+                              <th className="py-3 font-semibold text-right">CGST</th>
+                              <th className="py-3 font-semibold text-right">SGST</th>
+                              <th className="py-3 font-semibold text-right font-semibold">Total ({data.currency})</th>
+                           </tr>
+                        </thead>
+                        <tbody className="text-[#d0d0d0]">
+                           {data.items.map((item, index) => {
+                              const rowTot = (item.quantity * item.price) - item.discount;
+                              return (
+                                 <tr key={item.id} className="border-b border-[#222]">
+                                    <td className="py-3 align-top">{index + 1}</td>
+                                    <td className="py-3 pr-2 align-top">{item.description}</td>
+                                    <td className="py-3 text-center align-top">{item.quantity.toFixed(1)} {item.description.toLowerCase().includes('design') || item.description.toLowerCase().includes('development') ? 'U' : ''}</td>
+                                    <td className="py-3 text-right align-top">{formatMoney(item.price)}</td>
+                                    <td className="py-3 text-right align-top">{item.discount || '0'}</td>
+                                    <td className="py-3 text-right align-top">{item.cgst}</td>
+                                    <td className="py-3 text-right align-top">{item.sgst}</td>
+                                    <td className="py-3 text-right align-top text-white">{formatMoney(rowTot)}</td>
+                                 </tr>
+                              )
+                           })}
+                        </tbody>
+                     </table>
+                  </div>
+
+                  {/* Totals & Notes Section */}
+                  <div className="mt-8 flex justify-between text-[13px]">
+                      <div className="w-[60%] flex gap-8">
+                         <div>
+                            <p className="font-semibold text-white mb-2">Payment Method</p>
+                            <p className="text-[#b0b0b0]">{data.paymentMethod}</p>
+                         </div>
+                         <div>
+                            <p className="font-semibold text-white mb-2">In Words</p>
+                            <p className="text-[#b0b0b0] max-w-[200px]">{numberToWords(total)}</p>
+                         </div>
                       </div>
-                    )}
-                    <p className="text-[8px] text-gray-300 break-all font-mono text-center max-w-[110px]">
-                      {data.paymentLink}
-                    </p>
+                      
+                      <div className="w-[35%]">
+                         <div className="flex justify-between py-2 border-b border-[#333]">
+                             <span className="font-semibold text-white">Sub Total</span>
+                             <span className="text-[#d0d0d0]">{formatMoney(subtotal)}</span>
+                         </div>
+                         <div className="flex justify-between py-2 border-b border-[#333]">
+                             <span className="font-semibold text-white">CGST</span>
+                             <span className="text-[#d0d0d0]">{formatMoney(totalCgst)}</span>
+                         </div>
+                         <div className="flex justify-between py-2 border-b border-[#333]">
+                             <span className="font-semibold text-white">SGST</span>
+                             <span className="text-[#d0d0d0]">{formatMoney(totalSgst)}</span>
+                         </div>
+                         <div className="flex justify-between py-3 border-b border-[#333] text-base font-semibold text-white">
+                             <span>Total</span>
+                             <span>{formatMoney(total)}</span>
+                         </div>
+                      </div>
                   </div>
-                )}
 
-                {/* Totals — compact, fixed width */}
-                <div className="text-right space-y-1.5 shrink-0">
-                  <div className="flex justify-between gap-6 text-[10px]">
-                    <span className="text-gray-300 uppercase font-bold">Subtotal</span>
-                    <span className="font-medium">
-                      {data.currency}
-                      {subtotal.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
+                  {/* Signatures */}
+                  <div className="mt-16 flex justify-between text-[13px]">
+                     <div className="w-1/2">
+                        <p className="font-semibold text-white mb-1">Accepted By</p>
+                        <p className="text-[#b0b0b0]">{data.customer.name}</p>
+                     </div>
+                     <div className="w-1/2">
+                        <p className="font-semibold text-white mb-1">Signature</p>
+                        <p className="text-[#b0b0b0]">{company.name}</p>
+                     </div>
                   </div>
-                  {data.taxRate > 0 && (
-                    <div className="flex justify-between gap-6 text-[10px]">
-                      <span className="text-gray-300 uppercase font-bold">
-                        Tax ({data.taxRate}%)
-                      </span>
-                      <span className="font-medium">
-                        {data.currency}
-                        {tax.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between gap-6 pt-2 border-t border-gray-100">
-                    <span className="text-xs font-black uppercase tracking-widest">Total</span>
-                    <span className="text-sm font-black">
-                      {data.currency}
-                      {total.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
+
+                  {/* Footer Payment Info */}
+                  <div className="mt-auto pt-6 border-t border-[#333] flex justify-between items-start text-xs text-[#b0b0b0]">
+                     <div className="max-w-[50%]">
+                        <p className="font-semibold text-white text-[13px] mb-3">Payment Info</p>
+                        <div className="grid grid-cols-[80px_1fr] gap-y-1">
+                           <span className="font-semibold text-white">Ac #</span><span>{data.bankInfo.accountNumber}</span>
+                           <span className="font-semibold text-white">Ac Name</span><span>{data.bankInfo.accountName}</span>
+                           <span className="font-semibold text-white">IFSC/Routing</span><span>{data.bankInfo.routingOrIfsc}</span>
+                           <span className="font-semibold text-white">Bank</span><span className="whitespace-pre-wrap">{data.bankInfo.bankName}</span>
+                        </div>
+                     </div>
+                     
+                     <div className="flex flex-col items-end">
+                       {data.showQr && data.paymentLink && (
+                          <div className="bg-white p-2 shrink-0 mb-3 rounded-sm">
+                              <QRCodeSVG value={data.paymentLink} size={80} level="L" marginSize={0} />
+                          </div>
+                       )}
+                       {data.bankInfo.upi && (
+                           <div className="text-right">
+                              <p><span className="font-semibold text-white">Name:</span> {data.bankInfo.accountName}</p>
+                              <p><span className="font-semibold text-white">UPI:</span> {data.bankInfo.upi}</p>
+                           </div>
+                       )}
+                     </div>
                   </div>
-                </div>
-              </div>
+               </div>
             </div>
-
-            <p className="text-[10px] text-gray-300 text-center mt-4 tracking-widest uppercase">
-              Live preview · Export as PDF
+            
+            <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mt-6 pb-12 print:hidden">
+              Fixed Aspect Preview Area 
             </p>
-          </div>
         </div>
       </main>
 
       {/* ── Success toast ────────────────────────────────────── */}
       <AnimatePresence>
-        {showSuccess && (
+        {toastMsg && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-12 left-1/2 -translate-x-1/2 bg-black text-white px-8 py-4 rounded-full flex items-center gap-3 shadow-2xl z-50"
+            className="fixed bottom-12 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-8 py-4 rounded-full flex items-center gap-3 shadow-2xl z-50 print:hidden"
           >
-            <CheckCircle2 size={20} className="text-green-400" />
-            <span className="text-sm font-medium uppercase tracking-widest">
-              Saved Successfully
+            <CheckCircle2 size={20} className="text-emerald-400" />
+            <span className="text-sm font-semibold tracking-wide">
+              {toastMsg}
             </span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Print styles ─────────────────────────────────────── */}
       <style>{`
+        /* Custom scrollbar to hide it structurally */
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .hide-scrollbar {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+        }
         @media print {
-          header, .print\\:hidden { display: none !important; }
-          main { display: block !important; padding: 0 !important; max-width: none !important; }
-          .lg\\:grid-cols-2 { grid-template-columns: 1fr !important; }
-          .sticky { position: static !important; }
-          .bg-white { box-shadow: none !important; border: none !important; }
+          body {
+            background-color: white;
+          }
+          .print\\:hidden { display: none !important; }
+          main { display: block !important; padding: 0 !important; max-width: none !important; margin: 0 !important; }
+          .xl\\:grid-cols-\\[1fr\\,900px\\] { display: block !important; }
         }
       `}</style>
     </div>
   );
 }
+

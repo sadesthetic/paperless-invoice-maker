@@ -13,23 +13,36 @@ export interface CustomerInfo {
   phone: string;
 }
 
+export interface BankInfo {
+  accountNumber: string;
+  accountName: string;
+  bankName: string;
+  routingOrIfsc: string;
+  upi?: string;
+}
+
 export interface LineItem {
   id: string;
   description: string;
   quantity: number;
   price: number;
+  discount: number;
+  cgst: number;
+  sgst: number;
 }
 
 export interface DocumentData {
   type: 'Receipt' | 'Invoice';
   number: string;
   date: string;
-  dueDate?: string;
+  dueDate: string;
   customer: CustomerInfo;
+  shippedTo: CustomerInfo;
   items: LineItem[];
   currency: string;
   notes: string;
-  taxRate: number;
+  paymentMethod: string;
+  bankInfo: BankInfo;
   paymentLink?: string;
   showQr: boolean;
 }
