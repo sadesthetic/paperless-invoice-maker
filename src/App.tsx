@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { CompanyInfo, DocumentData, LineItem } from './types';
 import {
   Download,
@@ -30,11 +30,19 @@ const DEFAULT_COMPANY: CompanyInfo = {
   website: 'www.innovustech.in',
 };
 
+// Formato AAAA-MM-DDTHH:mm para el input datetime-local
+const getNow = () => {
+    const d = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 const INITIAL_DATA: DocumentData = {
   type: 'Invoice',
   number: 'INV-2024-052',
-  date: '14 Sep, 2024',
+  date: getNow(), // "2024-09-14T15:30"
   dueDate: '21 Sep, 2024',
+  purpose: 'Courier Service',
   customer: {
     name: 'Nike Inc.',
     address: 'Nike One Way, Hollywood Blv.,\nLos Angeles, 110022 CA\nUSA',
@@ -48,21 +56,16 @@ const INITIAL_DATA: DocumentData = {
     phone: '',
   },
   items: [
-    { id: '1', description: 'Website Design', quantity: 1, price: 50000, discount: 0, cgst: 9, sgst: 9 },
-    { id: '2', description: 'Website Development', quantity: 1, price: 20000, discount: 0, cgst: 9, sgst: 9 },
-    { id: '3', description: 'UX Design', quantity: 1, price: 20000, discount: 0, cgst: 9, sgst: 9 },
-    { id: '4', description: 'Website Copywriting', quantity: 1, price: 10000, discount: 0, cgst: 9, sgst: 9 },
+    { id: '1', description: 'Website Design', quantity: 1, price: 50000 },
+    { id: '2', description: 'Website Development', quantity: 1, price: 20000 },
+    { id: '3', description: 'UX Design', quantity: 1, price: 20000 },
+    { id: '4', description: 'Website Copywriting', quantity: 1, price: 10000 },
   ],
   currency: '₹',
   notes: '',
   paymentMethod: 'Cash',
-  bankInfo: {
-    accountNumber: '510101006820471',
-    accountName: 'Innovus Tech',
-    bankName: 'Union Bank Of India,\nPratapnagar branch, Nagpur, MH',
-    routingOrIfsc: 'UBIN0933465',
-    upi: 'innovustech@uboi'
-  },
+  internalAcNumber: '510101006820471',
+  upi: 'innovustech@uboi',
   paymentLink: 'upi://pay?pa=dummy&pn=Dummy',
   showQr: true,
 };
@@ -74,10 +77,22 @@ const formatMoney = (val: number) => {
 
 // Simple function to convert numbers to words (limited capability for demo)
 function numberToWords(num: number): string {
-  // Simplistic placeholder implementation; fully robust ones are large
-  if (num === 0) return 'Zero Rupees Only';
-  return 'One Lakh Eighteen Thousand Rupees Only'; // Using a hardcoded sample for aesthetic closeness based on the user's template, but in a real app, use a dedicated library like 'number-to-words'
+  if (num === 0) return 'Zero Only';
+  return 'One Lakh Eighteen Thousand Only'; // Placeholder based on template
 }
+
+const formatDateTime = (dtStr: string) => {
+    if(!dtStr) return '';
+    try {
+        const d = new Date(dtStr);
+        if (isNaN(d.getTime())) return dtStr;
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const m = d.toLocaleString('en-US', { month: 'short' });
+        return `${pad(d.getDate())} ${m}, ${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch {
+        return dtStr;
+    }
+};
 
 /* ─── Component ─────────────────────────────────────────────── */
 export default function App() {
@@ -88,10 +103,8 @@ export default function App() {
   const previewRef = useRef<HTMLDivElement>(null);
 
   /* ── Computed totals ───────────────────────────────────────── */
-  const subtotal = data.items.reduce((sum, item) => sum + (item.price * item.quantity - item.discount), 0);
-  const totalCgst = data.items.reduce((sum, item) => sum + ((item.price * item.quantity - item.discount) * item.cgst / 100), 0);
-  const totalSgst = data.items.reduce((sum, item) => sum + ((item.price * item.quantity - item.discount) * item.sgst / 100), 0);
-  const total = subtotal + totalCgst + totalSgst;
+  const subtotal = data.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const total = subtotal; // since SGST, CGST and discount are gone
 
   /* ── Line item helpers ─────────────────────────────────────── */
   const addItem = () => {
@@ -99,10 +112,7 @@ export default function App() {
       id: Math.random().toString(36).substring(2, 9),
       description: '',
       quantity: 1,
-      price: 0,
-      discount: 0,
-      cgst: 9,
-      sgst: 9
+      price: 0
     };
     setData((prev) => ({ ...prev, items: [...prev.items, newItem] }));
   };
@@ -161,7 +171,8 @@ export default function App() {
     tsv += `Website:\t${company.website || ''}\n`;
     tsv += `\nINVOICE INFO\t\n`;
     tsv += `Invoice No:\t${data.number}\n`;
-    tsv += `Invoice Date:\t${data.date}\n`;
+    tsv += `Invoice Date:\t${formatDateTime(data.date)}\n`;
+    tsv += `Purpose:\t${data.purpose}\n`;
     tsv += `Due Amount:\t${data.currency} ${formatMoney(total)}\n`;
     tsv += `Due Date:\t${data.dueDate}\n`;
     tsv += `\nINVOICE TO\t\n`;
@@ -171,15 +182,12 @@ export default function App() {
     tsv += `Name:\t${data.shippedTo.name}\n`;
     tsv += `Address:\t${escape(data.shippedTo.address)}\n`;
     tsv += `\nITEMS\n`;
-    tsv += `Description\tQty\tRate\tDis.\tCGST%\tSGST%\tTotal\n`;
+    tsv += `Description\tQty\tRate\tTotal\n`;
     data.items.forEach(i => {
-      const rowTot = i.quantity * i.price - i.discount;
-      tsv += `${escape(i.description)}\t${i.quantity}\t${i.price}\t${i.discount}\t${i.cgst}\t${i.sgst}\t${rowTot}\n`;
+      const rowTot = i.quantity * i.price;
+      tsv += `${escape(i.description)}\t${i.quantity}\t${i.price}\t${rowTot}\n`;
     });
     tsv += `\nTOTALS\n`;
-    tsv += `Sub Total:\t${formatMoney(subtotal)}\n`;
-    tsv += `CGST:\t${formatMoney(totalCgst)}\n`;
-    tsv += `SGST:\t${formatMoney(totalSgst)}\n`;
     tsv += `Grand Total:\t${formatMoney(total)}\n`;
     
     navigator.clipboard.writeText(tsv);
@@ -282,7 +290,7 @@ export default function App() {
 
           <div className={sectionCls}>
              <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Settings size={16}/> Document Setup</h2>
-             <div className="grid grid-cols-2 gap-4">
+             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                    <label className={labelCls}>Number</label>
                    <input type="text" className={inputCls} value={data.number} onChange={(e) => setData(p => ({...p, number: e.target.value}))}/>
@@ -292,12 +300,16 @@ export default function App() {
                   <input type="text" className={inputCls} value={data.currency} onChange={(e) => setData(p => ({...p, currency: e.target.value}))}/>
                 </div>
                 <div>
-                   <label className={labelCls}>Date</label>
-                   <input type="text" className={inputCls} value={data.date} onChange={(e) => setData(p => ({...p, date: e.target.value}))}/>
+                   <label className={labelCls}>Date & Time</label>
+                   <input type="datetime-local" className={inputCls} value={data.date} onChange={(e) => setData(p => ({...p, date: e.target.value}))}/>
                 </div>
                 <div>
                    <label className={labelCls}>Due Date</label>
                    <input type="text" className={inputCls} value={data.dueDate} onChange={(e) => setData(p => ({...p, dueDate: e.target.value}))}/>
+                </div>
+                <div className="col-span-full lg:col-span-2">
+                   <label className={labelCls}>Purpose (e.g. Courier Service)</label>
+                   <input type="text" className={inputCls} value={data.purpose} onChange={(e) => setData(p => ({...p, purpose: e.target.value}))}/>
                 </div>
              </div>
           </div>
@@ -341,11 +353,8 @@ export default function App() {
                    <thead>
                       <tr className="border-b border-slate-200">
                          <th className="py-2 text-xs font-semibold text-slate-500 uppercase">Desc</th>
-                         <th className="py-2 text-xs font-semibold text-slate-500 uppercase w-16">Qty</th>
-                         <th className="py-2 text-xs font-semibold text-slate-500 uppercase w-24">Rate</th>
-                         <th className="py-2 text-xs font-semibold text-slate-500 uppercase w-20">Dis.</th>
-                         <th className="py-2 text-xs font-semibold text-slate-500 uppercase w-20">CGST%</th>
-                         <th className="py-2 text-xs font-semibold text-slate-500 uppercase w-20">SGST%</th>
+                         <th className="py-2 text-xs font-semibold text-slate-500 uppercase w-20">Qty</th>
+                         <th className="py-2 text-xs font-semibold text-slate-500 uppercase w-32">Rate</th>
                          <th className="py-2 w-8"></th>
                       </tr>
                    </thead>
@@ -362,9 +371,6 @@ export default function App() {
                               <td className="py-2 pr-2"><input type="text" className={inputCls} value={item.description} onChange={(e) => updateItem(item.id, 'description', e.target.value)}/></td>
                               <td className="py-2 px-1"><input type="number" min={1} className={cn(inputCls,"px-2 text-center")} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)}/></td>
                               <td className="py-2 px-1"><input type="number" min={0} className={cn(inputCls,"px-2 text-right")} value={item.price} onChange={(e) => updateItem(item.id, 'price', parseFloat(e.target.value) || 0)}/></td>
-                              <td className="py-2 px-1"><input type="number" min={0} className={cn(inputCls,"px-2 text-right")} value={item.discount} onChange={(e) => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0)}/></td>
-                              <td className="py-2 px-1"><input type="number" min={0} className={cn(inputCls,"px-2 text-center")} value={item.cgst} onChange={(e) => updateItem(item.id, 'cgst', parseFloat(e.target.value) || 0)}/></td>
-                              <td className="py-2 px-1"><input type="number" min={0} className={cn(inputCls,"px-2 text-center")} value={item.sgst} onChange={(e) => updateItem(item.id, 'sgst', parseFloat(e.target.value) || 0)}/></td>
                               <td className="py-2 pl-2">
                                  <button onClick={() => removeItem(item.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 flex items-center justify-center">
                                     <Trash2 size={16}/>
@@ -379,31 +385,19 @@ export default function App() {
           </div>
 
           <div className={sectionCls}>
-             <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Banknote size={16}/> Payment Details</h2>
+             <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Banknote size={16}/> Payment Info</h2>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                    <label className={labelCls}>Payment Method</label>
                    <input type="text" className={inputCls} value={data.paymentMethod} onChange={(e) => setData(p => ({...p, paymentMethod: e.target.value}))}/>
                 </div>
                 <div>
-                   <label className={labelCls}>Bank / Ac Name</label>
-                   <input type="text" className={inputCls} value={data.bankInfo.accountName} onChange={(e) => setData(p => ({...p, bankInfo: {...p.bankInfo, accountName: e.target.value}}))}/>
-                </div>
-                <div>
-                   <label className={labelCls}>Account Number</label>
-                   <input type="text" className={inputCls} value={data.bankInfo.accountNumber} onChange={(e) => setData(p => ({...p, bankInfo: {...p.bankInfo, accountNumber: e.target.value}}))}/>
-                </div>
-                <div>
-                   <label className={labelCls}>IFSC Code</label>
-                   <input type="text" className={inputCls} value={data.bankInfo.routingOrIfsc} onChange={(e) => setData(p => ({...p, bankInfo: {...p.bankInfo, routingOrIfsc: e.target.value}}))}/>
-                </div>
-                <div className="col-span-full">
-                   <label className={labelCls}>Bank Address/Details</label>
-                   <textarea className={textareaCls} value={data.bankInfo.bankName} onChange={(e) => setData(p => ({...p, bankInfo: {...p.bankInfo, bankName: e.target.value}}))}/>
+                   <label className={labelCls}>Internal Ac Number</label>
+                   <input type="text" className={inputCls} value={data.internalAcNumber} onChange={(e) => setData(p => ({...p, internalAcNumber: e.target.value}))}/>
                 </div>
                 <div className="col-span-full md:col-span-1">
                    <label className={labelCls}>UPI / VPA</label>
-                   <input type="text" className={inputCls} value={data.bankInfo.upi || ''} onChange={(e) => setData(p => ({...p, bankInfo: {...p.bankInfo, upi: e.target.value}}))}/>
+                   <input type="text" className={inputCls} value={data.upi || ''} onChange={(e) => setData(p => ({...p, upi: e.target.value}))}/>
                 </div>
                 <div className="col-span-full md:col-span-1">
                    <label className={labelCls}>QR Payment Link / URL</label>
@@ -434,23 +428,18 @@ export default function App() {
           </div>
         </div>
 
-        {/* ── Preview Column (Right Side - Fixed Dimensions Layout Container) ──────────────── */}
+        {/* ── Preview Column (Fixed Dimensions wrapper to ensure alignment never breaks) ──────────────── */}
         <div className="flex flex-col items-center">
-            {/* 
-              This container handles device agnosticism and guarantees fixed distribution.
-              We use a wrapper with overflow-auto, and inside we use a fixed size 
-              800px width element tailored for A4 aspect ratio 
-            */}
-            <div className="w-full overflow-x-auto rounded-lg shadow-xl ring-1 ring-slate-200 hide-scrollbar bg-slate-900 print:shadow-none print:ring-0 print:overflow-visible">
+            <div className="w-full overflow-x-auto rounded-lg shadow-xl ring-1 ring-slate-200 hide-scrollbar bg-slate-900 print:shadow-none print:ring-0 print:overflow-visible flex justify-center">
                <div 
                   ref={previewRef}
-                  className="w-[800px] h-[1131px] bg-[#0a0a0a] text-[#f1f1f1] font-sans antialiased p-12 flex flex-col mx-auto relative tracking-wide shrink-0"
+                  /* Flex basis allows the content to stretch beyond fixed height if it really needs to, preventing cutoff */
+                  className="w-[800px] min-h-[1131px] bg-[#0a0a0a] text-[#f1f1f1] font-sans antialiased p-12 flex flex-col relative tracking-wide shrink-0"
                >
                   {/* Top Header Grid */}
                   <div className="flex justify-between items-start mb-14">
-                      {/* Logo or Text representation */}
-                      <h1 className="text-4xl font-bold tracking-tighter text-white font-sans">{company.name.toUpperCase()}</h1>
-                      <h2 className="text-3xl font-bold tracking-widest text-[#f1f1f1] uppercase">{data.type}</h2>
+                      <h1 className="text-4xl font-bold tracking-tighter text-white font-sans whitespace-pre-wrap">{company.name.toUpperCase()}</h1>
+                      <h2 className="text-3xl font-bold tracking-widest text-[#f1f1f1] uppercase shrink-0">{data.type}</h2>
                   </div>
 
                   {/* Top Company Info */}
@@ -461,47 +450,51 @@ export default function App() {
                      </div>
                      <div className="flex-1">
                         <span className="font-semibold text-white mb-1 block">Contact</span>
-                        <p>{company.website}</p>
-                        <p>{company.phone}</p>
-                        <p>{company.email}</p>
+                        {company.website && <p>{company.website}</p>}
+                        {company.phone && <p>{company.phone}</p>}
+                        {company.email && <p>{company.email}</p>}
                      </div>
                   </div>
 
                   {/* Divider */}
-                  <div className="h-[1px] bg-[#333] w-full mb-6"></div>
+                  <div className="h-[1px] bg-[#333] w-full mb-6 relative"></div>
 
-                  <div className="flex justify-between mb-8 text-sm">
-                     <div className="w-1/4">
+                  <div className="flex justify-between mb-8 text-sm gap-4">
+                     <div className="flex-1">
                         <p className="font-semibold text-white mb-2 text-[13px]">Due Amount</p>
                         <p className="text-[#d0d0d0]">{data.currency} {formatMoney(total)}</p>
                      </div>
-                     <div className="w-1/4">
+                     <div className="flex-1">
                         <p className="font-semibold text-white mb-2 text-[13px]">Due Date</p>
                         <p className="text-[#d0d0d0]">{data.dueDate}</p>
                      </div>
-                     <div className="w-1/4">
+                     <div className="flex-1">
                         <p className="font-semibold text-white mb-2 text-[13px]">Invoice #</p>
                         <p className="text-[#d0d0d0]">{data.number}</p>
                      </div>
-                     <div className="w-1/4">
+                     <div className="flex-[1.5]">
                         <p className="font-semibold text-white mb-2 text-[13px]">Invoice Date</p>
-                        <p className="text-[#d0d0d0]">{data.date}</p>
+                        <p className="text-[#d0d0d0] whitespace-nowrap">{formatDateTime(data.date)}</p>
                      </div>
                   </div>
 
                   {/* Divider */}
                   <div className="h-[1px] bg-[#333] w-full mb-6"></div>
 
-                  <div className="flex mb-12 text-sm leading-relaxed text-[#b0b0b0]">
-                     <div className="w-1/2 pr-6">
+                  <div className="flex mb-12 text-sm leading-relaxed text-[#b0b0b0] gap-4">
+                     <div className="w-1/3 pr-4">
                         <p className="font-semibold text-white mb-2 text-[13px]">Invoice To</p>
                         <p className="font-semibold text-white">{data.customer.name}</p>
                         <p className="whitespace-pre-wrap mt-0.5">{data.customer.address}</p>
                      </div>
-                     <div className="w-1/2 pr-6">
+                     <div className="w-1/3 pr-4">
                         <p className="font-semibold text-white mb-2 text-[13px]">Shipped To</p>
                         <p className="font-semibold text-white">{data.shippedTo.name}</p>
                         <p className="whitespace-pre-wrap mt-0.5">{data.shippedTo.address}</p>
+                     </div>
+                     <div className="w-1/3">
+                        <p className="font-semibold text-white mb-2 text-[13px]">Purpose</p>
+                        <p className="whitespace-pre-wrap">{data.purpose}</p>
                      </div>
                   </div>
 
@@ -512,26 +505,20 @@ export default function App() {
                            <tr className="border-y border-[#333] text-white">
                               <th className="py-3 font-semibold w-8">#</th>
                               <th className="py-3 font-semibold">Desc. of Goods/Services</th>
-                              <th className="py-3 font-semibold text-center w-16">Qty.</th>
+                              <th className="py-3 font-semibold text-center w-20">Qty.</th>
                               <th className="py-3 font-semibold text-right">Rate ({data.currency})</th>
-                              <th className="py-3 font-semibold text-right">Dis.</th>
-                              <th className="py-3 font-semibold text-right">CGST</th>
-                              <th className="py-3 font-semibold text-right">SGST</th>
                               <th className="py-3 font-semibold text-right font-semibold">Total ({data.currency})</th>
                            </tr>
                         </thead>
                         <tbody className="text-[#d0d0d0]">
                            {data.items.map((item, index) => {
-                              const rowTot = (item.quantity * item.price) - item.discount;
+                              const rowTot = (item.quantity * item.price);
                               return (
                                  <tr key={item.id} className="border-b border-[#222]">
                                     <td className="py-3 align-top">{index + 1}</td>
                                     <td className="py-3 pr-2 align-top">{item.description}</td>
                                     <td className="py-3 text-center align-top">{item.quantity.toFixed(1)} {item.description.toLowerCase().includes('design') || item.description.toLowerCase().includes('development') ? 'U' : ''}</td>
                                     <td className="py-3 text-right align-top">{formatMoney(item.price)}</td>
-                                    <td className="py-3 text-right align-top">{item.discount || '0'}</td>
-                                    <td className="py-3 text-right align-top">{item.cgst}</td>
-                                    <td className="py-3 text-right align-top">{item.sgst}</td>
                                     <td className="py-3 text-right align-top text-white">{formatMoney(rowTot)}</td>
                                  </tr>
                               )
@@ -541,7 +528,7 @@ export default function App() {
                   </div>
 
                   {/* Totals & Notes Section */}
-                  <div className="mt-8 flex justify-between text-[13px]">
+                  <div className="mt-8 flex justify-between text-[13px] pb-12">
                       <div className="w-[60%] flex gap-8">
                          <div>
                             <p className="font-semibold text-white mb-2">Payment Method</p>
@@ -553,19 +540,7 @@ export default function App() {
                          </div>
                       </div>
                       
-                      <div className="w-[35%]">
-                         <div className="flex justify-between py-2 border-b border-[#333]">
-                             <span className="font-semibold text-white">Sub Total</span>
-                             <span className="text-[#d0d0d0]">{formatMoney(subtotal)}</span>
-                         </div>
-                         <div className="flex justify-between py-2 border-b border-[#333]">
-                             <span className="font-semibold text-white">CGST</span>
-                             <span className="text-[#d0d0d0]">{formatMoney(totalCgst)}</span>
-                         </div>
-                         <div className="flex justify-between py-2 border-b border-[#333]">
-                             <span className="font-semibold text-white">SGST</span>
-                             <span className="text-[#d0d0d0]">{formatMoney(totalSgst)}</span>
-                         </div>
+                      <div className="w-[35%] ml-auto max-w-[250px]">
                          <div className="flex justify-between py-3 border-b border-[#333] text-base font-semibold text-white">
                              <span>Total</span>
                              <span>{formatMoney(total)}</span>
@@ -573,27 +548,12 @@ export default function App() {
                       </div>
                   </div>
 
-                  {/* Signatures */}
-                  <div className="mt-16 flex justify-between text-[13px]">
-                     <div className="w-1/2">
-                        <p className="font-semibold text-white mb-1">Accepted By</p>
-                        <p className="text-[#b0b0b0]">{data.customer.name}</p>
-                     </div>
-                     <div className="w-1/2">
-                        <p className="font-semibold text-white mb-1">Signature</p>
-                        <p className="text-[#b0b0b0]">{company.name}</p>
-                     </div>
-                  </div>
-
                   {/* Footer Payment Info */}
-                  <div className="mt-auto pt-6 border-t border-[#333] flex justify-between items-start text-xs text-[#b0b0b0]">
-                     <div className="max-w-[50%]">
-                        <p className="font-semibold text-white text-[13px] mb-3">Payment Info</p>
+                  <div className="mt-auto pt-6 border-t border-[#333] flex justify-between items-start text-xs text-[#b0b0b0] pb-2">
+                     <div className="max-w-[60%]">
+                        <p className="font-semibold text-white text-[13px] mb-3">Internal / Reference Info</p>
                         <div className="grid grid-cols-[80px_1fr] gap-y-1">
-                           <span className="font-semibold text-white">Ac #</span><span>{data.bankInfo.accountNumber}</span>
-                           <span className="font-semibold text-white">Ac Name</span><span>{data.bankInfo.accountName}</span>
-                           <span className="font-semibold text-white">IFSC/Routing</span><span>{data.bankInfo.routingOrIfsc}</span>
-                           <span className="font-semibold text-white">Bank</span><span className="whitespace-pre-wrap">{data.bankInfo.bankName}</span>
+                           <span className="font-semibold text-white">Ac #</span><span>{data.internalAcNumber}</span>
                         </div>
                      </div>
                      
@@ -603,10 +563,9 @@ export default function App() {
                               <QRCodeSVG value={data.paymentLink} size={80} level="L" marginSize={0} />
                           </div>
                        )}
-                       {data.bankInfo.upi && (
+                       {data.upi && (
                            <div className="text-right">
-                              <p><span className="font-semibold text-white">Name:</span> {data.bankInfo.accountName}</p>
-                              <p><span className="font-semibold text-white">UPI:</span> {data.bankInfo.upi}</p>
+                              <p><span className="font-semibold text-white">UPI:</span> {data.upi}</p>
                            </div>
                        )}
                      </div>
@@ -615,7 +574,7 @@ export default function App() {
             </div>
             
             <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mt-6 pb-12 print:hidden">
-              Fixed Aspect Preview Area 
+              Responsive Preview Area 
             </p>
         </div>
       </main>
@@ -658,4 +617,3 @@ export default function App() {
     </div>
   );
 }
-
