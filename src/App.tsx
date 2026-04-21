@@ -160,31 +160,25 @@ export default function App() {
     // Helper to escape newlines / tabs if needed, but for TSV we'll replace newlines with space to avoid row breaking if it's not wrapped in quotes
     const escape = (str: string | undefined) => (str || "").replace(/\n/g, ", ").replace(/\t/g, " ");
 
-    tsv += `COMPANY\t\n`;
-    tsv += `Name:\t${company.name}\n`;
-    tsv += `Address:\t${escape(company.address)}\n`;
-    tsv += `Email:\t${company.email}\n`;
-    tsv += `Phone:\t${company.phone}\n`;
-    tsv += `Website:\t${company.website || ''}\n`;
-    tsv += `\nINVOICE INFO\t\n`;
-    tsv += `Invoice No:\t${data.number}\n`;
-    tsv += `Invoice Date:\t${formatDateTime(data.date)}\n`;
-    tsv += `Purpose:\t${data.purpose}\n`;
-    tsv += `Due Amount:\t$${formatMoney(total)}\n`;
-    tsv += `\nINVOICE TO\t\n`;
-    tsv += `Name:\t${data.customer.name}\n`;
-    tsv += `Address:\t${escape(data.customer.address)}\n`;
-    tsv += `\nSHIPPED TO\t\n`;
-    tsv += `Name:\t${data.shippedTo.name}\n`;
-    tsv += `Address:\t${escape(data.shippedTo.address)}\n`;
-    tsv += `\nITEMS\n`;
-    tsv += `Description\tQty\tRate\tTotal\n`;
-    data.items.forEach(i => {
-      const rowTot = i.quantity * i.price;
-      tsv += `${escape(i.description)}\t${i.quantity}\t${i.price}\t${rowTot}\n`;
-    });
-    tsv += `\nTOTALS\n`;
-    tsv += `Grand Total:\t${formatMoney(total)}\n`;
+    const itemsSummary = data.items.map(i => `${i.quantity}x ${escape(i.description)}`).join(' | ');
+
+    const values = [
+      formatDateTime(data.date),
+      data.number,
+      data.type,
+      escape(data.purpose),
+      escape(data.customer.name),
+      escape(data.customer.email),
+      itemsSummary,
+      subtotal.toFixed(2),
+      taxesAmount.toFixed(2),
+      handlingAmount.toFixed(2),
+      total.toFixed(2),
+      escape(data.paymentMethod),
+      escape(data.userTag)
+    ];
+
+    const tsv = values.join("\t");
     
     navigator.clipboard.writeText(tsv);
     showToast('Copied to Clipboard for Excel/Sheets!');
