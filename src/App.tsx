@@ -311,6 +311,10 @@ export default function App() {
                     <input type="text" className={inputCls} value={data.customer.name} onChange={(e) => setData(p => ({...p, customer: {...p.customer, name: e.target.value}}))}/>
                  </div>
                  <div>
+                    <label className={labelCls}>Email</label>
+                    <input type="email" className={inputCls} value={data.customer.email || ''} onChange={(e) => setData(p => ({...p, customer: {...p.customer, email: e.target.value}}))}/>
+                 </div>
+                 <div>
                     <label className={labelCls}>Address</label>
                     <textarea className={textareaCls} value={data.customer.address} onChange={(e) => setData(p => ({...p, customer: {...p.customer, address: e.target.value}}))}/>
                  </div>
@@ -494,6 +498,7 @@ export default function App() {
                      <div className="w-1/2 pr-6">
                         <p className="font-semibold text-white mb-2 text-[13px]">Invoice To</p>
                         <p className="font-semibold text-white">{data.customer.name}</p>
+                        {data.customer.email && <p className="text-white mt-0.5">{data.customer.email}</p>}
                         <p className="whitespace-pre-wrap mt-0.5">{data.customer.address}</p>
                      </div>
                      <div className="w-1/2 pr-6">
