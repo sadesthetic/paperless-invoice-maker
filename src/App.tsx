@@ -24,11 +24,11 @@ import { QRCodeSVG } from 'qrcode.react';
 
 /* ─── Defaults ─────────────────────────────────────────────── */
 const DEFAULT_COMPANY: CompanyInfo = {
-  name: 'Innovus Tech',
-  address: '67, Navniman Society, Pratap Nagar,\nNagpur, Maharashtra - 440022\nIndia',
-  email: 'hello@innovustech.in',
-  phone: '7709501644',
-  website: 'www.innovustech.in',
+  name: '',
+  address: '',
+  email: '',
+  phone: '',
+  website: '',
 };
 
 // Formato AAAA-MM-DDTHH:mm para el input datetime-local
@@ -40,35 +40,32 @@ const getNow = () => {
 
 const INITIAL_DATA: DocumentData = {
   type: 'Invoice',
-  number: 'INV-2024-052',
-  date: getNow(), // "2024-09-14T15:30"
-  purpose: 'Courier Service',
+  number: '',
+  date: getNow(),
+  purpose: '',
   customer: {
-    name: 'Nike Inc.',
-    address: 'Nike One Way, Hollywood Blv.,\nLos Angeles, 110022 CA\nUSA',
+    name: '',
+    address: '',
     email: '',
     phone: '',
   },
   shippedTo: {
-    name: 'Nike Inc.',
-    address: 'Nike Inc. Hollywood Blv.,\nLos Angeles,\n110022 CA,\nUSA',
+    name: '',
+    address: '',
     email: '',
     phone: '',
   },
   items: [
-    { id: '1', description: 'Website Design', quantity: 1, price: 50 },
-    { id: '2', description: 'Website Development', quantity: 1, price: 200 },
-    { id: '3', description: 'UX Design', quantity: 1, price: 200 },
-    { id: '4', description: 'Website Copywriting', quantity: 1, price: 100 },
+    { id: '1', description: '', quantity: 1, price: 0 },
   ],
   taxesRate: 0,
   handlingFee: 0,
   handlingFeeType: 'fixed',
   notes: '',
-  paymentMethod: 'Cash',
-  userTag: 'innovustech@uboi',
-  paymentLink: 'upi://pay?pa=dummy&pn=Dummy',
-  showQr: true,
+  paymentMethod: '',
+  userTag: '',
+  paymentLink: '',
+  showQr: false,
 };
 
 // Utilities for formatting
