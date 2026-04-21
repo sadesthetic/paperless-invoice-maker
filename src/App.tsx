@@ -13,7 +13,8 @@ import {
   Truck,
   CreditCard,
   Banknote,
-  QrCode
+  QrCode,
+  Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import html2canvas from 'html2canvas';
@@ -41,7 +42,6 @@ const INITIAL_DATA: DocumentData = {
   type: 'Invoice',
   number: 'INV-2024-052',
   date: getNow(), // "2024-09-14T15:30"
-  dueDate: '21 Sep, 2024',
   purpose: 'Courier Service',
   customer: {
     name: 'Nike Inc.',
@@ -56,12 +56,13 @@ const INITIAL_DATA: DocumentData = {
     phone: '',
   },
   items: [
-    { id: '1', description: 'Website Design', quantity: 1, price: 50000 },
-    { id: '2', description: 'Website Development', quantity: 1, price: 20000 },
-    { id: '3', description: 'UX Design', quantity: 1, price: 20000 },
-    { id: '4', description: 'Website Copywriting', quantity: 1, price: 10000 },
+    { id: '1', description: 'Website Design', quantity: 1, price: 50 },
+    { id: '2', description: 'Website Development', quantity: 1, price: 200 },
+    { id: '3', description: 'UX Design', quantity: 1, price: 200 },
+    { id: '4', description: 'Website Copywriting', quantity: 1, price: 100 },
   ],
-  currency: '₹',
+  taxes: 0,
+  handlingFee: 0,
   notes: '',
   paymentMethod: 'Cash',
   upi: 'innovustech@uboi',
@@ -97,7 +98,7 @@ export default function App() {
 
   /* ── Computed totals ───────────────────────────────────────── */
   const subtotal = data.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const total = subtotal; // since SGST, CGST and discount are gone
+  const total = subtotal + data.taxes + data.handlingFee;
 
   /* ── Line item helpers ─────────────────────────────────────── */
   const addItem = () => {
@@ -166,8 +167,7 @@ export default function App() {
     tsv += `Invoice No:\t${data.number}\n`;
     tsv += `Invoice Date:\t${formatDateTime(data.date)}\n`;
     tsv += `Purpose:\t${data.purpose}\n`;
-    tsv += `Due Amount:\t${data.currency} ${formatMoney(total)}\n`;
-    tsv += `Due Date:\t${data.dueDate}\n`;
+    tsv += `Due Amount:\t$${formatMoney(total)}\n`;
     tsv += `\nINVOICE TO\t\n`;
     tsv += `Name:\t${data.customer.name}\n`;
     tsv += `Address:\t${escape(data.customer.address)}\n`;
@@ -283,27 +283,20 @@ export default function App() {
 
           <div className={sectionCls}>
              <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Settings size={16}/> Document Setup</h2>
-             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                   <label className={labelCls}>Number</label>
-                   <input type="text" className={inputCls} value={data.number} onChange={(e) => setData(p => ({...p, number: e.target.value}))}/>
-                </div>
-                <div>
-                  <label className={labelCls}>Currency</label>
-                  <input type="text" className={inputCls} value={data.currency} onChange={(e) => setData(p => ({...p, currency: e.target.value}))}/>
-                </div>
-                <div>
-                   <label className={labelCls}>Date & Time</label>
-                   <input type="datetime-local" className={inputCls} value={data.date} onChange={(e) => setData(p => ({...p, date: e.target.value}))}/>
-                </div>
-                <div>
-                   <label className={labelCls}>Due Date</label>
-                   <input type="text" className={inputCls} value={data.dueDate} onChange={(e) => setData(p => ({...p, dueDate: e.target.value}))}/>
-                </div>
-                <div className="col-span-full lg:col-span-2">
-                   <label className={labelCls}>Purpose (e.g. Courier Service)</label>
-                   <input type="text" className={inputCls} value={data.purpose} onChange={(e) => setData(p => ({...p, purpose: e.target.value}))}/>
-                </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                 <div>
+                    <label className={labelCls}>Number</label>
+                    <input type="text" className={inputCls} value={data.number} onChange={(e) => setData(p => ({...p, number: e.target.value}))}/>
+                 </div>
+                 <div className="col-span-full md:col-span-1 lg:col-span-2">
+                    <label className={labelCls}>Date & Time</label>
+                    <div className="flex gap-2">
+                       <input type="datetime-local" className={cn(inputCls, 'flex-1')} value={data.date} onChange={(e) => setData(p => ({...p, date: e.target.value}))}/>
+                       <button onClick={() => setData(p => ({...p, date: getNow()}))} title="Set to Current Time" className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2.5 rounded-lg border border-slate-200 transition-colors flex items-center justify-center shrink-0">
+                          <Clock size={16}/>
+                       </button>
+                    </div>
+                 </div>
              </div>
           </div>
 
@@ -375,11 +368,32 @@ export default function App() {
                    </tbody>
                 </table>
              </div>
+             
+             <div className="flex flex-col md:flex-row gap-4 mt-2 pt-4 border-t border-slate-100">
+                 <div className="flex-1">
+                    <label className={labelCls}>Taxes</label>
+                    <div className="relative">
+                       <span className="absolute left-3 top-2.5 text-slate-400 font-semibold">$</span>
+                       <input type="number" min={0} className={cn(inputCls, "pl-7")} value={data.taxes} onChange={(e) => setData(p => ({...p, taxes: parseFloat(e.target.value) || 0}))}/>
+                    </div>
+                 </div>
+                 <div className="flex-1">
+                    <label className={labelCls}>Handling & Transport</label>
+                    <div className="relative">
+                       <span className="absolute left-3 top-2.5 text-slate-400 font-semibold">$</span>
+                       <input type="number" min={0} className={cn(inputCls, "pl-7")} value={data.handlingFee} onChange={(e) => setData(p => ({...p, handlingFee: parseFloat(e.target.value) || 0}))}/>
+                    </div>
+                 </div>
+              </div>
           </div>
 
           <div className={sectionCls}>
              <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><Banknote size={16}/> Payment Info</h2>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="col-span-full">
+                    <label className={labelCls}>Purpose (e.g. Courier Service)</label>
+                    <input type="text" className={inputCls} value={data.purpose} onChange={(e) => setData(p => ({...p, purpose: e.target.value}))}/>
+                 </div>
                 <div>
                    <label className={labelCls}>Payment Method</label>
                    <input type="text" className={inputCls} value={data.paymentMethod} onChange={(e) => setData(p => ({...p, paymentMethod: e.target.value}))}/>
@@ -451,19 +465,15 @@ export default function App() {
                   <div className="flex justify-between mb-8 text-sm gap-4">
                      <div className="flex-1">
                         <p className="font-semibold text-white mb-2 text-[13px]">Due Amount</p>
-                        <p className="text-[#d0d0d0]">{data.currency} {formatMoney(total)}</p>
-                     </div>
-                     <div className="flex-1">
-                        <p className="font-semibold text-white mb-2 text-[13px]">Due Date</p>
-                        <p className="text-[#d0d0d0]">{data.dueDate}</p>
-                     </div>
-                     <div className="flex-1">
-                        <p className="font-semibold text-white mb-2 text-[13px]">Invoice #</p>
-                        <p className="text-[#d0d0d0]">{data.number}</p>
+                        <p className="text-[#d0d0d0]">${formatMoney(total)}</p>
                      </div>
                      <div className="flex-[1.5]">
                         <p className="font-semibold text-white mb-2 text-[13px]">Invoice Date</p>
                         <p className="text-[#d0d0d0] whitespace-nowrap">{formatDateTime(data.date)}</p>
+                     </div>
+                     <div className="flex-1">
+                        <p className="font-semibold text-white mb-2 text-[13px]">Invoice #</p>
+                        <p className="text-[#d0d0d0]">{data.number}</p>
                      </div>
                   </div>
 
@@ -491,8 +501,8 @@ export default function App() {
                               <th className="py-3 font-semibold w-8">#</th>
                               <th className="py-3 font-semibold">Desc. of Goods/Services</th>
                               <th className="py-3 font-semibold text-center w-20">Qty.</th>
-                              <th className="py-3 font-semibold text-right">Rate ({data.currency})</th>
-                              <th className="py-3 font-semibold text-right font-semibold">Total ({data.currency})</th>
+                              <th className="py-3 font-semibold text-right">Rate ($)</th>
+                              <th className="py-3 font-semibold text-right">Total ($)</th>
                            </tr>
                         </thead>
                         <tbody className="text-[#d0d0d0]">
@@ -533,10 +543,30 @@ export default function App() {
                          </div>
                       </div>
                       
-                      <div className="w-[35%] ml-auto max-w-[250px]">
-                         <div className="flex justify-between py-3 border-b border-[#333] text-base font-semibold text-white">
+                      <div className="w-[45%] ml-auto max-w-[280px]">
+                         {data.taxes > 0 || data.handlingFee > 0 ? (
+                            <>
+                               <div className="flex justify-between py-2 text-[#b0b0b0]">
+                                   <span>Subtotal</span>
+                                   <span>${formatMoney(subtotal)}</span>
+                               </div>
+                               {data.taxes > 0 && (
+                                  <div className="flex justify-between py-2 text-[#b0b0b0]">
+                                      <span>Taxes</span>
+                                      <span>${formatMoney(data.taxes)}</span>
+                                  </div>
+                               )}
+                               {data.handlingFee > 0 && (
+                                  <div className="flex justify-between py-2 text-[#b0b0b0]">
+                                      <span>Handling & Transport</span>
+                                      <span>${formatMoney(data.handlingFee)}</span>
+                                  </div>
+                               )}
+                            </>
+                         ) : null}
+                         <div className="flex justify-between py-3 border-b border-[#333] text-base font-semibold text-white mt-1">
                              <span>Total</span>
-                             <span>{formatMoney(total)}</span>
+                             <span>${formatMoney(total)}</span>
                          </div>
                       </div>
                   </div>

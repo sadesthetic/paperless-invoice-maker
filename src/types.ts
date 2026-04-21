@@ -24,12 +24,12 @@ export interface DocumentData {
   type: 'Receipt' | 'Invoice';
   number: string;
   date: string;
-  dueDate: string;
   purpose: string;
   customer: CustomerInfo;
   shippedTo: CustomerInfo;
   items: LineItem[];
-  currency: string;
+  taxes: number;
+  handlingFee: number;
   notes: string;
   paymentMethod: string;
   upi?: string;
