@@ -136,15 +136,19 @@ export default function App() {
     setIsGenerating(true);
     try {
       const canvas = await html2canvas(previewRef.current, {
-        scale: 2,
+        scale: 2, // Keeps text sharp but increases pixels
         backgroundColor: '#0a0a0a',
         useCORS: true,
       });
-      const imgData = canvas.toDataURL('image/png');
+      // Convert to JPEG with 80% quality to massively reduce file size (PNG is typically 10x larger)
+      const imgData = canvas.toDataURL('image/jpeg', 0.8);
+      
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      
+      // Use 'JPEG' and 'FAST' compression in jsPDF
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
       pdf.save(`${data.type}_${data.number}.pdf`);
       showToast('PDF Saved Successfully');
     } catch (err) {
